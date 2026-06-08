@@ -1,0 +1,64 @@
+site_name: AgentSynth
+site_description: Synthetic agentic trajectories generator with an LLM-as-Judge eval loop
+site_url: https://agentsynth.github.io/agentsynth/
+repo_url: https://github.com/agentsynth/agentsynth
+repo_name: agentsynth/agentsynth
+docs_dir: docs
+
+theme:
+  name: material
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - content.code.copy
+    - search.suggest
+    - toc.follow
+
+nav:
+  - Home: index.md
+  - Vision: VISION.md
+  - Architecture: ARCHITECTURE.md
+  - Fine-tune & benchmark: BENCHMARK.md
+  - Manifesto: MANIFESTO.md
+  - API reference: reference.md
+  - Roadmap: https://github.com/agentsynth/agentsynth/blob/main/ROADMAP.md
+  - Contributing: https://github.com/agentsynth/agentsynth/blob/main/CONTRIBUTING.md
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            show_root_heading: true
+            show_source: false
+            members_order: source
+            separate_signature: true
+            docstring_style: google
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - toc:
+      permalink: true
