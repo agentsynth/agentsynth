@@ -1,0 +1,17 @@
+# A grounded analytics run: tool calls hit a real SQLite database and a real
+# Python subprocess, so observations are actual output.
+#
+#   from agentsynth import load_recipe, run_recipe
+#   result = run_recipe(load_recipe("recipes/analytics_sql.yaml"))
+#   print(result.metrics["pass_rate"], "->", result.output_path)
+
+name: analytics-sql
+query: Which region had the highest total revenue, and how did products compare?
+num_trajectories: 12
+mode: single_agent
+vary_modes: true
+environment: sql+python
+evaluate: true
+export_format: jsonl
+export_path: analytics_sql.jsonl
+max_workers: 4
