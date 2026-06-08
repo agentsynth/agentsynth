@@ -1,0 +1,9 @@
+# Deps for the Gradio app / Hugging Face Space (CPU only).
+gradio>=5.0,<6.0
+pydantic>=2.5
+litellm>=1.40
+plotly>=5.18
+pandas>=2.0
+datasets>=2.18
+huggingface-hub>=0.23
+pyyaml>=6.0

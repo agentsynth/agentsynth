@@ -1,0 +1,128 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agentsynth"
+version = "0.2.0"
+description = "Synthetic Agentic Trajectories Generator + LLM-as-Judge Eval Loop for fine-tuning agentic LLMs"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [{ name = "agentsynth" }]
+keywords = [
+    "synthetic-data",
+    "agentic-ai",
+    "llm-finetuning",
+    "trajectories",
+    "tool-use",
+    "llm-as-judge",
+    "datasets",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+# Core install (`pip install agentsynth`) stays light: just generate + export.
+dependencies = [
+    "pydantic>=2.5",
+]
+
+[project.optional-dependencies]
+# LLM-as-Judge + real LLM generation across providers (Claude / Grok / Groq / OpenAI).
+llm = ["litellm>=1.40"]
+# Connect to MCP servers as a tool source (Python 3.10+).
+mcp = ["mcp>=1.2"]
+# Push datasets to the Hugging Face Hub.
+hub = ["huggingface-hub>=0.23", "datasets>=2.18"]
+# Fine-tuning scripts (SFT + DPO). GPU recommended; `unsloth` is optional on top.
+train = ["trl>=0.9", "transformers>=4.40", "peft>=0.10", "datasets>=2.18", "accelerate>=0.30"]
+# Everything needed to run the Gradio app + dashboards + HF dataset export.
+app = [
+    "gradio>=5.0,<6.0",
+    "litellm>=1.40",
+    "plotly>=5.18",
+    "pandas>=2.0",
+    "datasets>=2.18",
+    "huggingface-hub>=0.23",
+    "pyyaml>=6.0",
+]
+dev = [
+    "pytest>=8.0",
+    "pytest-cov>=4.1",
+    "ruff>=0.6",
+    "mypy>=1.8",
+    "build>=1.2",
+    "pre-commit>=3.5",
+    "pyyaml>=6.0",
+    "types-PyYAML>=6.0",
+]
+# Build the documentation site.
+docs = ["mkdocs-material>=9.5", "mkdocstrings[python]>=0.25"]
+all = [
+    "litellm>=1.40",
+    "gradio>=5.0,<6.0",
+    "plotly>=5.18",
+    "pandas>=2.0",
+    "datasets>=2.18",
+    "huggingface-hub>=0.23",
+    "pyyaml>=6.0",
+    "mcp>=1.2; python_version >= '3.10'",
+]
+
+[project.urls]
+Homepage = "https://github.com/agentsynth/agentsynth"
+Repository = "https://github.com/agentsynth/agentsynth"
+"Hugging Face Space" = "https://huggingface.co/spaces/agentsynth/agentsynth"
+Issues = "https://github.com/agentsynth/agentsynth/issues"
+
+[project.scripts]
+agentsynth = "agentsynth.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["agentsynth*"]
+
+[tool.setuptools.package-data]
+agentsynth = ["py.typed"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py39"
+extend-exclude = [".venv*", "*.ipynb"]
+
+[tool.ruff.lint]
+# pyflakes, pycodestyle, and import sorting. We deliberately skip pyupgrade so
+# the typing stays 3.9-compatible (List/Dict/Optional, not list/dict/X | None).
+select = ["E", "F", "I"]
+
+[tool.mypy]
+python_version = "3.9"
+ignore_missing_imports = true
+warn_unused_ignores = false
+files = ["agentsynth"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.coverage.run]
+source = ["agentsynth"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+exclude_lines = [
+    "pragma: no cover",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+]

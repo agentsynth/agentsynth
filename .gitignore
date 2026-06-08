@@ -1,0 +1,49 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+build/
+dist/
+wheels/
+*.egg
+
+# Virtual envs
+.venv/
+.venv*/
+venv/
+env/
+ENV/
+
+# Tooling / caches
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.ipynb_checkpoints/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Secrets / local config
+.env
+.env.*
+*.local
+
+# Gradio / generated artifacts
+gradio_cached_examples/
+flagged/
+*.tmp.jsonl
+outputs/
+
+# Hugging Face
+.cache/
+
+# Internal planning / strategy (kept out of the public repo)
+planning/
+
+# mkdocs build output
+site/
