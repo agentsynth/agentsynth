@@ -1,0 +1,37 @@
+"""Regression tests for bugs found in the pre-release review."""
+
+from agentsynth.environments import SQLEnvironment
+from agentsynth.pipelines import Recipe, run_recipe
+from agentsynth.utils import DEFAULT_TOOL_CATALOG, default_tool_catalog, parse_tool_catalog
+
+
+def test_tool_catalog_is_not_aliased():
+    # Editing one parsed tool's schema must not leak into other copies or the global.
+    a = default_tool_catalog()
+    b = default_tool_catalog()
+    a[0].parameters["properties"]["__leak__"] = 1
+    assert "__leak__" not in b[0].parameters.get("properties", {})
+    assert "__leak__" not in DEFAULT_TOOL_CATALOG[0]["parameters"]["properties"]
+
+
+def test_parse_tool_catalog_does_not_mutate_input():
+    raw = [{"name": "t", "parameters": {"properties": {"a": {"type": "string"}}}}]
+    parse_tool_catalog(raw)
+    assert "type" not in raw[0]["parameters"]  # input left untouched
+
+
+def test_recipe_uses_all_explicit_queries():
+    queries = [f"analyze data set number {i} by region" for i in range(15)]
+    result = run_recipe(Recipe(queries=queries, evaluate=False))
+    assert len(result.trajectories) == 15  # not truncated to the default num_trajectories
+
+
+def test_recipe_explicit_count_still_caps_queries():
+    queries = ["one query here", "another distinct query"]
+    result = run_recipe(Recipe(queries=queries, num_trajectories=5, evaluate=False))
+    assert len(result.trajectories) == 5  # explicit count wins
+
+
+def test_sql_multistatement_does_not_raise():
+    out = SQLEnvironment().execute("sql_query", {"query": "SELECT 1; DROP TABLE sales"})
+    assert out.startswith("SQLError")
