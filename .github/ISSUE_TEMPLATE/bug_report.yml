@@ -1,0 +1,43 @@
+name: Bug report
+description: Something doesn't work the way it should.
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What did you do, and what went wrong?
+      placeholder: A clear description of the bug, plus the full traceback if there is one.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Reproduction
+      description: The smallest snippet or command that triggers it.
+      render: python
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: AgentSynth version
+      placeholder: "0.1.0 (or a commit SHA)"
+    validations:
+      required: true
+  - type: dropdown
+    id: backend
+    attributes:
+      label: Backend
+      options:
+        - Mock (offline)
+        - Real LLM (Anthropic / OpenAI / Groq / xAI / other)
+    validations:
+      required: true
+  - type: input
+    id: env
+    attributes:
+      label: Python / OS
+      placeholder: "Python 3.11 on macOS 14"
+    validations:
+      required: true

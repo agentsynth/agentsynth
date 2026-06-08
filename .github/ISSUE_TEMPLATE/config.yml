@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Questions & ideas
+    url: https://github.com/agentsynth/agentsynth/discussions
+    about: Ask a question or float an idea in Discussions before opening an issue.
+  - name: Live demo
+    url: https://huggingface.co/spaces/agentsynth/agentsynth
+    about: Try AgentSynth in the browser.
