@@ -6,8 +6,12 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-06-09
+
 ### Added
 
+- A batch explorer in the Gradio app — click a row in the overview to inspect that
+  trajectory's steps and judge verdict, with mode / min-score filters.
 - `BrowserEnvironment` (`environments/`): a headless-Chromium backend (Playwright) for
   grounded web tool-use — `browser_navigate`, `browser_read`, `browser_links`,
   `browser_find`, `browser_click`. Install with `agentsynth-ai[browser]` plus a one-time
