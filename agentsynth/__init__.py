@@ -24,6 +24,7 @@ from .benchmarks import (
 )
 from .dedup import DedupResult, decontaminate, dedup_trajectories
 from .environments import (
+    BrowserEnvironment,
     CompositeEnvironment,
     Environment,
     MCPEnvironment,
@@ -115,6 +116,7 @@ __all__ = [
     "SQLEnvironment",
     "PythonSandbox",
     "MCPEnvironment",
+    "BrowserEnvironment",
     # tasks
     "SeedTask",
     "SEED_TASKS",

@@ -309,6 +309,26 @@ env.close()
 
 Needs `pip install "agentsynth-ai[mcp]"` (Python 3.10+).
 
+### Browsing the web
+
+`BrowserEnvironment` drives a real headless Chromium, so trajectories carry grounded web
+tool-use — navigating, reading page text, and following links:
+
+```python
+from agentsynth import AgentTrajectoryGenerator
+from agentsynth.environments import BrowserEnvironment
+
+env = BrowserEnvironment(start_url="https://example.com")
+gen = AgentTrajectoryGenerator(environment=env)
+
+traj = gen.generate("open the page and read what it says")
+print(traj.tool_names_used())   # browser_navigate, browser_read, ...
+env.close()
+```
+
+Needs `pip install "agentsynth-ai[browser]"` and a one-time `playwright install chromium`
+(Python 3.10+).
+
 ---
 
 ## Run the app locally
@@ -443,7 +463,7 @@ AgentSynth/
 │   ├── dedup.py            # near-duplicate removal + decontamination
 │   ├── hub.py              # push datasets to the Hugging Face Hub
 │   ├── cli.py              # the `agentsynth` CLI
-│   ├── environments/       # SQL, Python, MCP, composite — run tool calls for real
+│   ├── environments/       # SQL, Python, MCP, browser, composite — run tool calls for real
 │   ├── tasks/              # seed-task taxonomy
 │   ├── pipelines/          # Recipe + run_recipe (generate → verify → export)
 │   ├── verification/       # verifiers, judge ensemble, rubric presets

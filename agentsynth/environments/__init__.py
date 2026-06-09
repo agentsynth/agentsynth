@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from .base import CompositeEnvironment, Environment
+from .browser import BrowserEnvironment
 from .mcp_env import MCPEnvironment
 from .python_sandbox import PythonSandbox
 from .sql import SQLEnvironment
@@ -13,4 +14,5 @@ __all__ = [
     "SQLEnvironment",
     "PythonSandbox",
     "MCPEnvironment",
+    "BrowserEnvironment",
 ]

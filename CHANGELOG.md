@@ -6,6 +6,18 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- `BrowserEnvironment` (`environments/`): a headless-Chromium backend (Playwright) for
+  grounded web tool-use — `browser_navigate`, `browser_read`, `browser_links`,
+  `browser_find`, `browser_click`. Install with `agentsynth-ai[browser]` plus a one-time
+  `playwright install chromium` (Python 3.10+).
+
+### Changed
+
+- The PyPI distribution name is now **`agentsynth-ai`** (the name `agentsynth` was already
+  taken). The import package and the CLI are unchanged — still `import agentsynth`.
+
 ## [0.2.0] - 2026-06-08
 
 ### Added

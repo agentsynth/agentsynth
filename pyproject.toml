@@ -42,6 +42,8 @@ dependencies = [
 llm = ["litellm>=1.40"]
 # Connect to MCP servers as a tool source (Python 3.10+).
 mcp = ["mcp>=1.2"]
+# Headless-browser environment for grounded web tool-use (run `playwright install chromium`).
+browser = ["playwright>=1.40"]
 # Push datasets to the Hugging Face Hub.
 hub = ["huggingface-hub>=0.23", "datasets>=2.18"]
 # Fine-tuning scripts (SFT + DPO). GPU recommended; `unsloth` is optional on top.

@@ -28,6 +28,8 @@ The public surface, re-exported from the top-level `agentsynth` package.
 
 ::: agentsynth.MCPEnvironment
 
+::: agentsynth.BrowserEnvironment
+
 ## Benchmark
 
 ::: agentsynth.run_benchmark
