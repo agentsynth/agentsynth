@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import json
 import tempfile
-from typing import Any, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import gradio as gr
 
@@ -127,21 +127,62 @@ def render_tree(traj: Any) -> str:
     return "\n".join(lines)
 
 
-def traj_overview_rows(trajectories: List[Any]) -> List[List[Any]]:
-    """One row per trajectory for the batch overview table."""
+def _eval_by_id(eval_results: Optional[List[Any]]) -> Dict[str, Any]:
+    return {getattr(ev, "trajectory_id", None): ev for ev in (eval_results or [])}
+
+
+def _overview_row(idx: int, traj: Any, by_id: Dict[str, Any]) -> List[Any]:
+    ev = by_id.get(traj.id)
+    score = round(float(ev.overall), 3) if ev is not None else "—"
+    return [
+        idx,
+        traj.mode,
+        traj.domain or "—",
+        traj.num_steps(),
+        score,
+        ", ".join(traj.tool_names_used()) or "—",
+        _truncate(traj.final_answer, 70),
+    ]
+
+
+def traj_overview_rows(
+    trajectories: List[Any], eval_results: Optional[List[Any]] = None
+) -> List[List[Any]]:
+    """One row per trajectory for the batch overview table (score fills in once judged)."""
+    by_id = _eval_by_id(eval_results)
+    return [_overview_row(idx, traj, by_id) for idx, traj in enumerate(trajectories or [])]
+
+
+def filter_overview_rows(
+    trajectories: List[Any],
+    eval_results: Optional[List[Any]],
+    mode: Optional[str],
+    min_score: float,
+) -> List[List[Any]]:
+    """Overview rows kept after the mode / min-score filters (the true idx stays in column 0)."""
+    by_id = _eval_by_id(eval_results)
     rows: List[List[Any]] = []
     for idx, traj in enumerate(trajectories or []):
-        tools_used = ", ".join(traj.tool_names_used()) or "—"
-        rows.append(
-            [
-                idx,
-                traj.mode,
-                traj.num_steps(),
-                tools_used,
-                _truncate(traj.final_answer, 80),
-            ]
-        )
+        if mode and mode != "all" and traj.mode != mode:
+            continue
+        ev = by_id.get(traj.id)
+        if min_score and float(min_score) > 0:
+            if ev is None or float(ev.overall) < float(min_score):
+                continue
+        rows.append(_overview_row(idx, traj, by_id))
     return rows
+
+
+def render_trajectory_detail(traj: Any, eval_results: Optional[List[Any]] = None) -> str:
+    """The full step tree for one trajectory, with its judge verdict on top if it's scored."""
+    if traj is None:
+        return "_Click a row in the batch overview to inspect a trajectory._"
+    tree = render_tree(traj)
+    ev = _eval_by_id(eval_results).get(traj.id)
+    if ev is None:
+        return tree
+    verdict = "✅ pass" if ev.passed else "❌ fail"
+    return f"**🧑‍⚖️ Judge — overall `{ev.overall:.3f}` ({verdict})**\n\n{tree}"
 
 
 def eval_rows(eval_results: List[Any]) -> List[List[Any]]:
@@ -161,7 +202,7 @@ def eval_rows(eval_results: List[Any]) -> List[List[Any]]:
 
 
 _EVAL_HEADERS = ["trajectory_id", "overall", "passed"] + list(RUBRIC_DIMENSIONS)
-_OVERVIEW_HEADERS = ["idx", "mode", "num_steps", "tools_used", "final_answer"]
+_OVERVIEW_HEADERS = ["idx", "mode", "domain", "steps", "score", "tools_used", "final_answer"]
 
 
 def _empty_fig(title: str = "No data yet"):
@@ -253,6 +294,41 @@ def do_generate(
         return (f"❌ Generation failed: {exc}", "", empty_overview, [])
 
 
+def do_select_trajectory(
+    trajectories: Optional[List[Any]],
+    eval_results: Optional[List[Any]],
+    overview: Any,
+    evt: gr.SelectData,
+) -> str:
+    """Render the trajectory for the clicked overview row — its true index is column 0."""
+    if not trajectories:
+        return "_Generate a batch first, then click a row to inspect it._"
+    try:
+        row = evt.index[0] if evt is not None and evt.index else 0
+        if overview is not None and hasattr(overview, "iloc"):
+            idx = int(overview.iloc[row, 0])
+        elif overview is not None and len(overview):
+            idx = int(overview[row][0])
+        else:
+            idx = int(row)
+    except Exception:
+        idx = 0
+    if idx < 0 or idx >= len(trajectories):
+        return "_That row is out of range — re-run the filter and try again._"
+    return render_trajectory_detail(trajectories[idx], eval_results)
+
+
+def do_filter_overview(
+    trajectories: Optional[List[Any]],
+    eval_results: Optional[List[Any]],
+    mode: str,
+    min_score: float,
+):
+    """Rebuild the overview table from the mode / min-score filters."""
+    rows = filter_overview_rows(trajectories, eval_results, mode, min_score)
+    return gr.update(value=rows, headers=_OVERVIEW_HEADERS)
+
+
 def do_evaluate(
     trajectories: Optional[List[Any]],
     model_choice: str,
@@ -263,7 +339,7 @@ def do_evaluate(
     empty_table = gr.update(value=[], headers=_EVAL_HEADERS)
     if not trajectories:
         msg = "🪄 Generate some trajectories first (Generate tab), then run the judge here."
-        return (empty_table, msg, [])
+        return (empty_table, msg, [], gr.update())
 
     try:
         model = _model_arg(model_choice)
@@ -302,11 +378,14 @@ def do_evaluate(
                 f"- `{r.trajectory_id}` — overall **{r.overall:.3f}** ({verdict}): "
                 f"{_truncate(r.explanation, 220)}"
             )
-        return (table, "\n".join(lines), results)
+        overview = gr.update(
+            value=traj_overview_rows(trajectories, results), headers=_OVERVIEW_HEADERS
+        )
+        return (table, "\n".join(lines), results, overview)
 
     except Exception as exc:
         gr.Warning(f"Evaluation failed: {exc}")
-        return (empty_table, f"❌ Evaluation failed: {exc}", [])
+        return (empty_table, f"❌ Evaluation failed: {exc}", [], gr.update())
 
 
 def do_metrics(
@@ -499,12 +578,28 @@ with gr.Blocks(theme=gr.themes.Soft(), title="AgentSynth") as demo:
         )
 
         gen_status = gr.Markdown("Ready. Configure your query and click **Generate**.")
-        gen_tree = gr.Markdown(label="First trajectory preview")
+
+        gr.Markdown("#### 🔎 Batch explorer — generate, then click any row to inspect it")
+        with gr.Row():
+            ov_mode = gr.Dropdown(
+                ["all", "single_agent", "multi_agent", "code_execution"],
+                value="all",
+                label="Filter: mode",
+                scale=2,
+            )
+            ov_min_score = gr.Slider(
+                0.0, 1.0, value=0.0, step=0.05, label="Filter: min judge score", scale=3
+            )
+            ov_filter_btn = gr.Button("Apply filters", scale=1)
         gen_overview = gr.Dataframe(
             headers=_OVERVIEW_HEADERS,
-            label="Batch overview",
+            label="Batch overview (click a row)",
             wrap=True,
             interactive=False,
+        )
+        gen_tree = gr.Markdown(
+            value="_Generate a batch, then click a row in the overview to inspect it._",
+            label="Selected trajectory",
         )
 
         gen_btn.click(
@@ -520,6 +615,17 @@ with gr.Blocks(theme=gr.themes.Soft(), title="AgentSynth") as demo:
                 gen_model,
             ],
             outputs=[gen_status, gen_tree, gen_overview, traj_state],
+        )
+
+        gen_overview.select(
+            do_select_trajectory,
+            inputs=[traj_state, eval_state, gen_overview],
+            outputs=[gen_tree],
+        )
+        ov_filter_btn.click(
+            do_filter_overview,
+            inputs=[traj_state, eval_state, ov_mode, ov_min_score],
+            outputs=[gen_overview],
         )
 
     with gr.Tab("🧑‍⚖️ Evaluate"):
@@ -548,7 +654,7 @@ with gr.Blocks(theme=gr.themes.Soft(), title="AgentSynth") as demo:
         eval_btn.click(
             do_evaluate,
             inputs=[traj_state, eval_model, eval_threshold],
-            outputs=[eval_table, eval_summary, eval_state],
+            outputs=[eval_table, eval_summary, eval_state, gen_overview],
         )
 
     with gr.Tab("📊 Metrics"):
