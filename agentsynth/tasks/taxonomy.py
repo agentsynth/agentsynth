@@ -159,6 +159,48 @@ SEED_TASKS: List[SeedTask] = [
         query="Summarize the main risks of deploying autonomous agents.",
         mode="single_agent",
     ),
+    SeedTask(
+        id="legal_1",
+        domain="legal",
+        query="Review a vendor agreement and flag unusual liability or indemnification terms.",
+        mode="multi_agent",
+    ),
+    SeedTask(
+        id="legal_2",
+        domain="legal",
+        query="Compare a policy draft against compliance requirements and identify gaps.",
+        mode="single_agent",
+    ),
+    SeedTask(
+        id="legal_3",
+        domain="legal",
+        query="Summarize recent legal arguments around fair use in AI training.",
+        mode="multi_agent",
+    ),
+    SeedTask(
+        id="health_1",
+        domain="healthcare",
+        query="Analyze patient data and identify trends related to treatment outcomes.",
+        mode="multi_agent",
+    ),
+    SeedTask(
+        id="health_2",
+        domain="healthcare",
+        query="Review patient symptoms and history and summarize possible explanations.",
+        mode="single_agent",
+    ),
+    SeedTask(
+        id="ecomm_1",
+        domain="ecommerce",
+        query="Review recent product reviews and categorize the main customer complaints.",
+        mode="multi_agent",
+    ),
+    SeedTask(
+        id="ecomm_2",
+        domain="ecommerce",
+        query="Calculate customer acquisition cost and lifetime value from recent sales data.",
+        mode="code_execution",
+    ),
 ]
 
 
