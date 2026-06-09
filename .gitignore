@@ -47,3 +47,6 @@ planning/
 
 # mkdocs build output
 site/
+
+# Proprietary cloud service (open-core; keep out of the public repo)
+cloud/
