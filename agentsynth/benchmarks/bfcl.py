@@ -56,23 +56,47 @@ def bfcl_case(
     )
 
 
+def _parse_jsonl(text: str) -> List[Dict[str, Any]]:
+    return [json.loads(line) for line in text.splitlines() if line.strip()]
+
+
 def _read_jsonl(path: str) -> List[Dict[str, Any]]:
     with open(path, encoding="utf-8") as fh:
-        return [json.loads(line) for line in fh if line.strip()]
+        return _parse_jsonl(fh.read())
 
 
-def load_bfcl(questions_path: str, answers_path: Optional[str] = None) -> List[BenchmarkCase]:
-    """Load BFCL question + possible-answer JSONL files into BenchmarkCases."""
-    questions = _read_jsonl(questions_path)
-    answers: Dict[str, Dict[str, Any]] = {}
-    if answers_path:
-        answers = {str(a.get("id")): a for a in _read_jsonl(answers_path)}
+def _build_cases(
+    questions: List[Dict[str, Any]], answers: Dict[str, Dict[str, Any]]
+) -> List[BenchmarkCase]:
     cases: List[BenchmarkCase] = []
     for q in questions:
         case = bfcl_case(q, answers.get(str(q.get("id"))))
         if case is not None:
             cases.append(case)
     return cases
+
+
+def load_bfcl(questions_path: str, answers_path: Optional[str] = None) -> List[BenchmarkCase]:
+    """Load BFCL question + possible-answer JSONL files into BenchmarkCases."""
+    answers: Dict[str, Dict[str, Any]] = {}
+    if answers_path:
+        answers = {str(a.get("id")): a for a in _read_jsonl(answers_path)}
+    return _build_cases(_read_jsonl(questions_path), answers)
+
+
+def load_sample_bfcl() -> List[BenchmarkCase]:
+    """The bundled 25-case BFCL `simple_python` slice. Runs offline, no download.
+
+    A real slice of the Berkeley Function-Calling Leaderboard (Apache-2.0); see
+    `agentsynth/benchmarks/data/NOTICE.md`. For the full suite, point `load_bfcl`
+    at the official BFCL files.
+    """
+    from importlib.resources import files
+
+    data = files("agentsynth.benchmarks") / "data"
+    questions = _parse_jsonl((data / "bfcl_sample.questions.jsonl").read_text(encoding="utf-8"))
+    raw = _parse_jsonl((data / "bfcl_sample.answers.jsonl").read_text(encoding="utf-8"))
+    return _build_cases(questions, {str(a.get("id")): a for a in raw})
 
 
 # A couple of BFCL-format records, for tests and an offline demo.
@@ -120,4 +144,4 @@ def sample_cases() -> List[BenchmarkCase]:
     return [c for c in (bfcl_case(q, a) for q, a in SAMPLE_BFCL) if c is not None]
 
 
-__all__ = ["bfcl_case", "load_bfcl", "sample_cases", "SAMPLE_BFCL"]
+__all__ = ["bfcl_case", "load_bfcl", "load_sample_bfcl", "sample_cases", "SAMPLE_BFCL"]

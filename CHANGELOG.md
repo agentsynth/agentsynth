@@ -12,6 +12,9 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   grounded web tool-use — `browser_navigate`, `browser_read`, `browser_links`,
   `browser_find`, `browser_click`. Install with `agentsynth-ai[browser]` plus a one-time
   `playwright install chromium` (Python 3.10+).
+- A bundled, real 25-case BFCL slice (`load_sample_bfcl()`) so the benchmark runs on a
+  recognized suite offline, plus runnable `examples/benchmark_bfcl.py` and
+  `examples/tau_bench_demo.py`.
 
 ### Changed
 

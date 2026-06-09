@@ -2,10 +2,13 @@ import json
 
 import pytest
 
+from agentsynth import AgentTrajectoryGenerator
 from agentsynth.benchmarks import (
     SAMPLE_BFCL,
+    agentsynth_model,
     bfcl_case,
     load_bfcl,
+    load_sample_bfcl,
     run_benchmark,
     run_tau_bench,
     sample_cases,
@@ -48,6 +51,25 @@ def test_load_bfcl_from_files(tmp_path):
     cases = load_bfcl(str(questions), str(answers))
     assert len(cases) == 2
     assert cases[0].expected_tool == "get_weather"
+
+
+def test_load_sample_bfcl_returns_the_bundled_real_slice():
+    cases = load_sample_bfcl()
+    assert len(cases) == 25
+    first = cases[0]
+    assert first.id == "simple_python_0"
+    assert first.expected_tool == "calculate_triangle_area"
+    assert "base" in first.expected_args
+    assert all(c.query and c.expected_tool for c in cases)
+
+
+def test_run_benchmark_on_the_bfcl_slice():
+    cases = load_sample_bfcl()
+    model = agentsynth_model(AgentTrajectoryGenerator(use_mock=True))
+    report = run_benchmark(model, cases=cases)
+    assert report.n == len(cases)
+    assert 0.0 <= report.tool_accuracy <= 1.0
+    assert 0.0 <= report.score <= 1.0
 
 
 def test_tau_bench_reports_missing_package():

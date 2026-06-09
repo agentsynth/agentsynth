@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from .bfcl import SAMPLE_BFCL, bfcl_case, load_bfcl, sample_cases
+from .bfcl import SAMPLE_BFCL, bfcl_case, load_bfcl, load_sample_bfcl, sample_cases
 from .tau_bench import run_tau_bench, tau_bench_available
 from .tool_calling import (
     BUILTIN_CASES,
@@ -28,6 +28,7 @@ __all__ = [
     "report_table_md",
     # BFCL
     "load_bfcl",
+    "load_sample_bfcl",
     "bfcl_case",
     "sample_cases",
     "SAMPLE_BFCL",

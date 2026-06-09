@@ -96,6 +96,7 @@ include = ["agentsynth*"]
 
 [tool.setuptools.package-data]
 agentsynth = ["py.typed"]
+"agentsynth.benchmarks" = ["data/*.jsonl", "data/*.md"]
 
 [tool.ruff]
 line-length = 100

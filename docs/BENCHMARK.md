@@ -65,10 +65,14 @@ before / after / Δ. A positive Δ is the headline result.
 
 ## Notes
 
-- The built-in benchmark is small. For public benchmarks, use the adapters:
-  `load_bfcl("BFCL_v3_simple.json", "possible_answer/BFCL_v3_simple.json")` returns
-  cases you can pass straight to `run_benchmark`, and `run_tau_bench(model=...)` bridges
-  to the official τ-bench harness (multi-turn, so it delegates to the `tau-bench` package).
+- The built-in benchmark is small, so the harness also runs recognized suites. A real
+  25-case slice of the Berkeley Function-Calling Leaderboard (`simple_python`) ships with
+  the package: `load_sample_bfcl()` returns cases you can pass straight to `run_benchmark`
+  — no download, fully offline (see [`examples/benchmark_bfcl.py`](https://github.com/agentsynth/agentsynth/blob/main/examples/benchmark_bfcl.py)).
+  For the full suite, download the official BFCL files and call
+  `load_bfcl("BFCL_v4_simple_python.json", "possible_answer/BFCL_v4_simple_python.json")`.
+  `run_tau_bench(model=...)` bridges to the official τ-bench harness (multi-turn, so it
+  delegates to the `tau-bench` package; see [`examples/tau_bench_demo.py`](https://github.com/agentsynth/agentsynth/blob/main/examples/tau_bench_demo.py)).
   Any model is a `model_fn(query, tools) -> (tool_name, tool_args)`; `prompted_model`
   wraps any text model, and `run_benchmark.py --model <litellm-id>` uses native tool calls.
 - Keep the benchmark queries out of the training set — generate training data with
