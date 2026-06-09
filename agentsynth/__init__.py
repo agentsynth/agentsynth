@@ -41,7 +41,7 @@ from .exporters import (
 )
 from .generator import AgentTrajectoryGenerator
 from .hub import dataset_card, prepare_dataset_dir, push_dataset
-from .metrics import compute_dataset_metrics, diversity_score
+from .metrics import compute_dataset_metrics, diversity_score, filter_dataset
 from .pipelines import Recipe, RunResult, load_recipe, make_environment, run_recipe
 from .preferences import (
     PreferencePair,
@@ -103,6 +103,7 @@ __all__ = [
     "TrajectoryEvaluator",
     # metrics
     "compute_dataset_metrics",
+    "filter_dataset",
     "diversity_score",
     # exporters
     "to_jsonl",

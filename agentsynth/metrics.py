@@ -398,9 +398,71 @@ def metrics_summary_md(metrics: Dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def filter_dataset(
+    trajectories: Sequence[Trajectory],
+    eval_results: Optional[Sequence[EvalResult]] = None,
+    min_score: float = 0.6,
+    verified_only: bool = False,
+    modes: Optional[Sequence[str]] = None,
+) -> Tuple[List[Trajectory], Dict[str, Any]]:
+    """Filter a batch of trajectories, returning the kept subset and a drop report.
+
+    Drops trajectories if:
+    - Their overall score in `eval_results` is below `min_score`.
+    - `verified_only` is True and the trajectory failed verification.
+    - `modes` is provided and the trajectory's mode is not in the list.
+    """
+    from typing import Tuple
+    
+    trajs = list(trajectories or [])
+    
+    eval_map = {}
+    if eval_results:
+        for res in eval_results:
+            eval_map[res.trajectory_id] = res
+
+    kept: List[Trajectory] = []
+    report = {
+        "initial": len(trajs),
+        "kept": 0,
+        "dropped_score": 0,
+        "dropped_verification": 0,
+        "dropped_mode": 0,
+        "dropped_total": 0,
+    }
+
+    mode_set = set(modes) if modes is not None else None
+
+    for t in trajs:
+        if mode_set is not None and t.mode not in mode_set:
+            report["dropped_mode"] += 1
+            report["dropped_total"] += 1
+            continue
+            
+        if verified_only:
+            ver_dict = t.verification or {}
+            if not ver_dict.get("verified", False):
+                report["dropped_verification"] += 1
+                report["dropped_total"] += 1
+                continue
+                
+        if eval_results is not None:
+            res = eval_map.get(t.id)
+            if res is None or res.overall < min_score:
+                report["dropped_score"] += 1
+                report["dropped_total"] += 1
+                continue
+                
+        kept.append(t)
+        
+    report["kept"] = len(kept)
+    return kept, report
+
+
 __all__ = [
     "compute_dataset_metrics",
     "diversity_score",
+    "filter_dataset",
     "plot_rubric_radar",
     "plot_score_distribution",
     "plot_pass_gauge",
