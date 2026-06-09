@@ -126,6 +126,8 @@ def run_recipe(recipe: Recipe, progress: Optional[Callable[..., Any]] = None) ->
         from ..verification.base import batch_verify
 
         verifications = batch_verify(trajectories)
+        for traj, ver in zip(trajectories, verifications):
+            traj.verification = ver.model_dump()
 
     from ..metrics import compute_dataset_metrics
 

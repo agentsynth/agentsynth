@@ -22,7 +22,7 @@ def to_openai_messages(trajectory: Trajectory) -> List[Dict[str, Any]]:
 
 
 def _traj_to_record(traj: Trajectory) -> Dict[str, Any]:
-    return {
+    record = {
         "id": traj.id,
         "query": traj.query,
         "mode": traj.mode,
@@ -35,6 +35,9 @@ def _traj_to_record(traj: Trajectory) -> Dict[str, Any]:
         "generator_model": traj.generator_model,
         "metadata": traj.metadata,
     }
+    if traj.verification is not None:
+        record["verification"] = traj.verification
+    return record
 
 
 def to_jsonl(trajectories: List[Trajectory], path: Optional[str] = None) -> str:
@@ -78,6 +81,8 @@ def load_jsonl(path: str) -> List[Trajectory]:
                 "generator_model": obj.get("generator_model", "mock"),
                 "metadata": obj.get("metadata", {}),
             }
+            if "verification" in obj:
+                traj_kwargs["verification"] = obj["verification"]
             if obj.get("id"):
                 traj_kwargs["id"] = obj["id"]
             trajectories.append(Trajectory(**traj_kwargs))

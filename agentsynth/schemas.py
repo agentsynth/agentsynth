@@ -106,6 +106,7 @@ class Trajectory(BaseModel):
     generator_model: str = "mock"
     metadata: Dict[str, Any] = Field(default_factory=dict)
     created_at: float = Field(default_factory=time.time)
+    verification: Optional[Dict[str, Any]] = None
 
     def num_steps(self) -> int:
         return len(self.steps)
