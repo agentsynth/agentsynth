@@ -8,24 +8,33 @@ first so we can agree on the shape before you write code.
 
 ## Getting set up
 
+The fastest path is `make`:
+
 ```bash
 git clone https://github.com/agentsynth/agentsynth
 cd agentsynth
+make setup        # create a .venv, install the dev toolchain + pre-commit
+make test         # run the suite, fully offline (mock mode)
+make lint         # ruff + mypy, exactly like CI
+```
+
+`make setup-all` also installs the app / MCP / browser extras (and downloads a headless
+Chromium); `make help` lists every target. Or open the repo in a **GitHub Codespace** —
+the devcontainer installs everything for you.
+
+Prefer to do it by hand?
+
+```bash
 python -m venv .venv && source .venv/bin/activate   # Python 3.10+ for the app, 3.9+ for the core
 pip install -e ".[app,dev]"
 pre-commit install
-```
-
-Run the checks the same way CI does:
-
-```bash
 pytest                       # tests run fully offline (mock mode)
 ruff check . && ruff format --check .
 mypy
 ```
 
-`pre-commit` will run ruff and a few hygiene hooks on every commit. To run it over
-the whole tree at once: `pre-commit run --all-files`.
+`pre-commit` runs ruff and a few hygiene hooks on every commit. To run it over the whole
+tree at once: `pre-commit run --all-files`.
 
 ## Ground rules for code
 
