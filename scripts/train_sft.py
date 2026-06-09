@@ -22,6 +22,29 @@ def _load_records(path: str) -> List[Dict[str, Any]]:
         return [json.loads(line) for line in fh if line.strip()]
 
 
+def render_chat_text(messages: List[Dict[str, Any]], tokenizer: Any) -> str:
+    """Render conversational `messages` to plain training text.
+
+    Unsloth's patched SFTTrainer doesn't auto-render `messages`, so we do it:
+    tool calls become a JSON line the model learns to emit, tool results become
+    observations, and the tokenizer's chat template does the framing (with a
+    plain-text fallback for tokenizers that don't have a compatible template).
+    """
+    msgs: List[Dict[str, str]] = []
+    for m in messages:
+        role, content = m["role"], m.get("content") or ""
+        calls = [c.get("function", c) for c in m.get("tool_calls") or []]
+        if calls:
+            content = (content + "\n" if content else "") + json.dumps({"tool_calls": calls})
+        if role == "tool":
+            role, content = "user", "Observation: " + content
+        msgs.append({"role": role, "content": content})
+    try:
+        return tokenizer.apply_chat_template(msgs, tokenize=False)
+    except Exception:
+        return "\n\n".join(f"### {m['role']}\n{m['content']}" for m in msgs)
+
+
 def main(argv: Optional[List[str]] = None) -> int:
     parser = argparse.ArgumentParser(description="SFT on an AgentSynth dataset.")
     parser.add_argument("--data", required=True, help="SFT JSONL (conversational `messages`).")
@@ -60,7 +83,9 @@ def main(argv: Optional[List[str]] = None) -> int:
         tokenizer = AutoTokenizer.from_pretrained(args.model)
         model = AutoModelForCausalLM.from_pretrained(args.model)
 
-    dataset = Dataset.from_list([{"messages": r["messages"]} for r in records])
+    dataset = Dataset.from_list(
+        [{"text": render_chat_text(r["messages"], tokenizer)} for r in records]
+    )
     config = SFTConfig(
         output_dir=args.out,
         num_train_epochs=args.epochs,
