@@ -49,7 +49,7 @@ build_dpo_dataset(pairs, "data/dpo.jsonl")
 ## 3. Fine-tune (GPU)
 
 ```bash
-pip install "agentsynth[train]"          # plus `unsloth` for the fast 4-bit path
+pip install "agentsynth-ai[train]"          # plus `unsloth` for the fast 4-bit path
 python scripts/train_sft.py --data data/sft.jsonl --model unsloth/llama-3.1-8b-bnb-4bit --out out/sft
 python scripts/train_dpo.py --data data/dpo.jsonl --model out/sft --out out/dpo
 ```

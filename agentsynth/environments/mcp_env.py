@@ -8,7 +8,7 @@ event loop, and only import `mcp` when an MCPEnvironment is actually constructed
     env = MCPEnvironment(command="python", args=["examples/mcp_server.py"])
     gen = AgentTrajectoryGenerator(environment=env)
 
-Requires `pip install "agentsynth[mcp]"` (Python 3.10+).
+Requires `pip install "agentsynth-ai[mcp]"` (Python 3.10+).
 """
 
 from __future__ import annotations

@@ -132,13 +132,13 @@ def push_dataset(
 ) -> str:
     """Build the dataset folder and upload it to the Hub. Returns the repo URL.
 
-    Requires `pip install "agentsynth[hub]"` and a write token (arg or HF login).
+    Requires `pip install "agentsynth-ai[hub]"` and a write token (arg or HF login).
     """
     try:
         from huggingface_hub import HfApi
     except Exception as exc:
         raise ImportError(
-            'push_dataset needs huggingface_hub: pip install "agentsynth[hub]"'
+            'push_dataset needs huggingface_hub: pip install "agentsynth-ai[hub]"'
         ) from exc
 
     import tempfile

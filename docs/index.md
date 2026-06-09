@@ -10,9 +10,9 @@ generating ones you can **trust**. So verification is core, not a side feature.
 ## Install
 
 ```bash
-pip install agentsynth                # core: generate + evaluate + export
-pip install "agentsynth[app]"         # + the Gradio UI
-pip install "agentsynth[all]"         # everything
+pip install agentsynth-ai                # core: generate + evaluate + export
+pip install "agentsynth-ai[app]"         # + the Gradio UI
+pip install "agentsynth-ai[all]"         # everything
 ```
 
 ## 60-second tour

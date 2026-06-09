@@ -3,7 +3,7 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "agentsynth"
+name = "agentsynth-ai"
 version = "0.2.0"
 description = "Synthetic Agentic Trajectories Generator + LLM-as-Judge Eval Loop for fine-tuning agentic LLMs"
 readme = "README.md"
@@ -32,7 +32,7 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
 
-# Core install (`pip install agentsynth`) stays light: just generate + export.
+# Core install (`pip install agentsynth-ai`) stays light: just generate + export.
 dependencies = [
     "pydantic>=2.5",
 ]
@@ -81,6 +81,7 @@ all = [
 
 [project.urls]
 Homepage = "https://github.com/agentsynth/agentsynth"
+Documentation = "https://agentsynth.github.io/agentsynth"
 Repository = "https://github.com/agentsynth/agentsynth"
 "Hugging Face Space" = "https://huggingface.co/spaces/agentsynth/agentsynth"
 Issues = "https://github.com/agentsynth/agentsynth/issues"

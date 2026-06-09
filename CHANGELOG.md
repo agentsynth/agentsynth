@@ -12,7 +12,7 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - Execution environments (`environments/`): `SQLEnvironment` (in-memory SQLite),
   `PythonSandbox` (isolated subprocess), `MCPEnvironment` (any Model Context Protocol
-  server, via `agentsynth[mcp]`), `CompositeEnvironment`. Pass `environment=` to the
+  server, via `agentsynth-ai[mcp]`), `CompositeEnvironment`. Pass `environment=` to the
   generator for real, grounded observations.
 - Seed-task taxonomy (`tasks/`) and a deterministic `sample_tasks`.
 - Declarative `Recipe` (loadable from YAML) and a concurrent `run_recipe` (`pipelines/`).

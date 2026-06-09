@@ -7,7 +7,7 @@ Use --dry-run to validate the data and config on CPU without training.
     python scripts/train_sft.py --data data/train.jsonl --model unsloth/llama-3.1-8b-bnb-4bit
     python scripts/train_sft.py --data data/train.jsonl --dry-run
 
-Install: pip install "agentsynth[train]"  (plus `unsloth` for the fast 4-bit path).
+Install: pip install "agentsynth-ai[train]"  (plus `unsloth` for the fast 4-bit path).
 """
 
 from __future__ import annotations

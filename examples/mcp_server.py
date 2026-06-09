@@ -5,7 +5,7 @@ Run it directly, or point an MCPEnvironment at it:
     from agentsynth.environments import MCPEnvironment
     env = MCPEnvironment(command="python", args=["examples/mcp_server.py"])
 
-Requires `pip install "agentsynth[mcp]"` (Python 3.10+).
+Requires `pip install "agentsynth-ai[mcp]"` (Python 3.10+).
 """
 
 from mcp.server.fastmcp import FastMCP

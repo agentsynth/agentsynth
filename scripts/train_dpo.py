@@ -7,7 +7,7 @@ SFT output. Use --dry-run to validate the data on CPU.
     python scripts/train_dpo.py --data data/dpo.jsonl --model out/sft --out out/dpo
     python scripts/train_dpo.py --data data/dpo.jsonl --dry-run
 
-Install: pip install "agentsynth[train]".
+Install: pip install "agentsynth-ai[train]".
 """
 
 from __future__ import annotations

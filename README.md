@@ -4,7 +4,7 @@
 
 <p align="center">
   <a href="https://github.com/agentsynth/agentsynth/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/agentsynth/agentsynth/actions/workflows/ci.yml/badge.svg"></a>
-  <a href="https://pypi.org/project/agentsynth/"><img alt="PyPI" src="https://img.shields.io/pypi/v/agentsynth.svg"></a>
+  <a href="https://pypi.org/project/agentsynth-ai/"><img alt="PyPI" src="https://img.shields.io/pypi/v/agentsynth-ai.svg"></a>
   <a href="https://codecov.io/gh/agentsynth/agentsynth"><img alt="coverage" src="https://codecov.io/gh/agentsynth/agentsynth/branch/main/graph/badge.svg"></a>
   <a href="https://www.python.org/downloads/"><img alt="Python 3.9+" src="https://img.shields.io/badge/python-3.9%2B-blue.svg"></a>
   <a href="https://github.com/agentsynth/agentsynth/blob/main/LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-green.svg"></a>
@@ -62,10 +62,10 @@ The eval loop scores six per-trajectory dimensions — task completion, tool cor
 
 ```bash
 # Core library (offline mock generation + eval, exporters, metrics)
-pip install agentsynth
+pip install agentsynth-ai
 
 # With the Gradio web UI
-pip install "agentsynth[app]"
+pip install "agentsynth-ai[app]"
 
 # For running the Hugging Face Space (pins everything the app needs)
 pip install -r requirements.txt
@@ -307,14 +307,14 @@ print(traj.tool_names_used())   # tools discovered from the MCP server
 env.close()
 ```
 
-Needs `pip install "agentsynth[mcp]"` (Python 3.10+).
+Needs `pip install "agentsynth-ai[mcp]"` (Python 3.10+).
 
 ---
 
 ## Run the app locally
 
 ```bash
-pip install "agentsynth[app]"
+pip install "agentsynth-ai[app]"
 python app.py
 ```
 
