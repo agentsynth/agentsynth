@@ -8,17 +8,20 @@ The north star: **the number of high-quality, verified agent trajectories people
 generate with this, and the number of models that get measurably better because of
 them.** Everything below serves that.
 
-## Where we are (v0.1.0)
+## Where we are (v0.3.0)
 
-The foundation is in place and works offline end to end:
+The engine works offline end to end, and the proof is public:
 
 - [x] Three generation modes: single-agent tool use, multi-agent, grounded code execution
 - [x] LLM-as-Judge eval loop over a six-dimension rubric, with a deterministic fallback
-- [x] Dataset metrics + Plotly dashboards
-- [x] JSONL / ShareGPT / ADP / Parquet export, JSONL round-trips
-- [x] Gradio app, CLI, offline test suite, CI
+- [x] Real environments: SQLite, Python sandbox, any MCP server, a headless browser
+- [x] Verification (re-run code, tool args, safety) + a learned verifier distilled from the judge
+- [x] A published dataset ([agentsynth-trajectories](https://huggingface.co/datasets/agentsynth/agentsynth-trajectories))
+      and a reproducible before/after fine-tune ([docs/BENCHMARK.md](docs/BENCHMARK.md))
+- [x] Dataset metrics + dashboards, batch explorer in the app, JSONL/ShareGPT/ADP/Parquet export
+- [x] Gradio app + HF Space, CLI, offline test suite, CI + coverage
 
-Today generation is mock-first. The next phases turn it into a real data engine.
+Mock generation is the default; a provider key switches on real-LLM generation.
 
 ## Real generation
 
@@ -28,7 +31,8 @@ tool that runs in an isolated subprocess, a seed-task taxonomy, and YAML recipes
 
 - [x] `environments/`: pluggable execution backends — SQLite (`sql_query`) and an
       isolated Python subprocess (`python`) are in
-- [ ] More environments: a hardened sandbox (gVisor/e2b-style), a browser env, a virtual filesystem
+- [x] A browser environment (headless Chromium via Playwright)
+- [ ] More environments: a hardened sandbox (gVisor/e2b-style), a virtual filesystem, REST/OpenAPI
 - [x] A seed-task taxonomy spanning domains and modes
 - [ ] Self-Instruct / Evol-Instruct expansion of the taxonomy for diversity and difficulty
 - [ ] Persona and environment injection to fight mode collapse
@@ -47,6 +51,7 @@ presets, DPO pairs, and dedup/decontamination.
       recorded output reproduces; plus tool-arg and safety checks
 - [ ] More verifiers: API ground-truth, unit-test harnesses for code tasks
 - [x] Judge ensembles with an agreement signal, and rubric presets (balanced / strict / lenient / safety_first)
+- [x] A learned verifier: distill the judge into a cheap classifier (`train_learned_verifier`)
 - [ ] Judge calibration against human labels
 - [x] Preference pairs (chosen / rejected) for DPO, with TRL-compatible export
 - [x] Near-duplicate removal (Jaccard shingles) and benchmark decontamination
@@ -64,9 +69,10 @@ result.
 - [x] Fine-tune scripts (TRL SFT + DPO, Unsloth-friendly) and a one-command repro guide
 - [x] HF Hub dataset push + auto dataset card (`push_dataset`, `dataset_card`)
 - [x] A Colab notebook (`notebooks/agentsynth_finetune.ipynb`): generate → SFT → DPO → benchmark on a free T4
-- [x] A BFCL adapter (`load_bfcl`) and a τ-bench bridge (`run_tau_bench`)
-- [ ] Run it for real: a flagship 10k+ verified dataset on the Hub and a published
-      before/after table on BFCL / τ-bench (needs a GPU run)
+- [x] A BFCL adapter (`load_bfcl`) + bundled real slices (simple & multiple splits) and a τ-bench bridge (`run_tau_bench`)
+- [x] Run it for real: a public dataset on the Hub and a published before/after table
+      (0% → 58.3% tool selection from a base 1B — see docs/BENCHMARK.md); scaling the
+      dataset to 10k+ with real-LLM generation is next
 - [ ] API-Bank and more benchmark adapters
 - [x] A docs site (mkdocs-material + mkdocstrings API reference), deployed to GitHub Pages
 - [ ] More tutorials and how-to guides on the docs site
