@@ -24,10 +24,17 @@ verified trajectories** distilled from a mock AgentSynth run (318 trajectories,
 | Arg accuracy | 0.0% | **58.3%** | +58.3 |
 | Overall | 0.0% | **58.3%** | +58.3 |
 
-On the bundled real BFCL `simple_python` slice the same checkpoint moves tool
-accuracy 60% → 64% — those cases offer a single candidate function, which is nearly
-trivial under answer-priming, so the slice mostly checks formatting. The `multiple`
-split (several candidate functions per case) is the meaningful next test.
+| BFCL `multiple` slice (25 real cases, 2-3 candidate functions) | Before | After | Δ |
+| --- | --- | --- | --- |
+| Tool accuracy | 24.0% | **48.0%** | +24.0 |
+| Arg accuracy | 8.0% | **28.0%** | +20.0 |
+| Overall | 16.0% | **38.0%** | +22.0 |
+
+The `multiple` split is the meaningful external test — every case offers several
+candidate functions the model has never seen, so the number reflects real tool
+selection, and it doubles. (The `simple_python` slice moves 60% → 68% tool accuracy,
+but with a single candidate function per case it mostly checks formatting under
+answer-priming, so we don't lead with it.)
 
 The training data here is the deterministic mock generator. Swapping in a real LLM
 generator (set a provider key) produces richer trajectories — especially better
