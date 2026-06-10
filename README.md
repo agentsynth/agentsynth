@@ -291,6 +291,21 @@ to_dpo_jsonl(pairs, "prefs.jsonl")   # {"prompt", "chosen", "rejected", "margin"
 Recipes can do it all at once — `Recipe(..., verify=True, dedup=True, rubric="strict")`
 adds verification, near-duplicate removal, and a stricter judge to the run.
 
+And when judging at scale gets expensive, distill the judge into a classifier — it
+screens trajectories in microseconds and reports how often it agrees with the real
+judge on held-out data:
+
+```python
+from agentsynth import train_learned_verifier
+
+verifier, report = train_learned_verifier(trajectories, eval_results)
+print(report["agreement"])               # held-out agreement with the LLM judge
+verify_trajectory(traj, verifiers=[verifier])   # plugs in like any other check
+```
+
+Needs `pip install "agentsynth-ai[learned]"` (scikit-learn). See
+[`examples/learned_verifier.py`](examples/learned_verifier.py).
+
 ### 6) Generate against a real MCP server
 
 Point AgentSynth at any [Model Context Protocol](https://modelcontextprotocol.io)

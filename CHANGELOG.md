@@ -8,6 +8,12 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- A learned verifier (`train_learned_verifier` / `LearnedVerifier`): distill the LLM
+  judge into a small classifier that screens trajectories in microseconds and reports
+  its held-out agreement with the judge. Behind the `learned` extra (scikit-learn).
+- The bundled BFCL sample gained the `multiple` split —
+  `load_sample_bfcl(split="multiple")` gives 25 real cases with 2-3 candidate
+  functions each, so the benchmark exercises tool *selection*, not just formatting.
 - Trajectories now carry their verification verdict into the exported JSONL (and back
   on load) when a run uses `verify=True`. Contributed by @Ishant5436 (#21).
 

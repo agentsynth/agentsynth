@@ -43,7 +43,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
           cache: pip
       - run: python -m pip install --upgrade pip
-      - run: pip install -e ".[llm,dev,mcp]" plotly pandas
+      - run: pip install -e ".[llm,dev,mcp,learned]" plotly pandas
       - name: pytest
         env:
           AGENTSYNTH_FORCE_MOCK: "1"

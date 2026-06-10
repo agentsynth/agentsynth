@@ -44,6 +44,8 @@ llm = ["litellm>=1.40"]
 mcp = ["mcp>=1.2"]
 # Headless-browser environment for grounded web tool-use (run `playwright install chromium`).
 browser = ["playwright>=1.40"]
+# Distill the LLM judge into a cheap classifier (LearnedVerifier).
+learned = ["scikit-learn>=1.3"]
 # Push datasets to the Hugging Face Hub.
 hub = ["huggingface-hub>=0.23", "datasets>=2.18"]
 # Fine-tuning scripts (SFT + DPO). GPU recommended; `unsloth` is optional on top.

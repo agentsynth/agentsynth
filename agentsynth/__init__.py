@@ -72,6 +72,7 @@ from .verification import (
     EnsembleEvaluator,
     ExecutionVerifier,
     ExpectedAnswerVerifier,
+    LearnedVerifier,
     SafetyVerifier,
     ToolArgVerifier,
     VerificationResult,
@@ -79,6 +80,7 @@ from .verification import (
     batch_verify,
     get_rubric,
     rubric_names,
+    train_learned_verifier,
     verify_trajectory,
 )
 
@@ -137,6 +139,8 @@ __all__ = [
     "SafetyVerifier",
     "ExpectedAnswerVerifier",
     "EnsembleEvaluator",
+    "LearnedVerifier",
+    "train_learned_verifier",
     "RUBRIC_PRESETS",
     "get_rubric",
     "rubric_names",

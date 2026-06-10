@@ -10,6 +10,7 @@ from .base import (
     verify_trajectory,
 )
 from .ensemble import EnsembleEvaluator
+from .learned import FEATURE_NAMES, LearnedVerifier, extract_features, train_learned_verifier
 from .rubrics import RUBRIC_PRESETS, get_rubric, rubric_names
 from .verifiers import (
     ExecutionVerifier,
@@ -31,6 +32,10 @@ __all__ = [
     "ExpectedAnswerVerifier",
     "default_verifiers",
     "EnsembleEvaluator",
+    "LearnedVerifier",
+    "train_learned_verifier",
+    "extract_features",
+    "FEATURE_NAMES",
     "RUBRIC_PRESETS",
     "get_rubric",
     "rubric_names",
