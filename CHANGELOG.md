@@ -6,6 +6,14 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- `RestEnvironment` (`environments/`): turn any OpenAPI spec (dict, JSON/YAML string,
+  file path, or URL) into runnable tools — operations become tools, path/query/JSON-body
+  parameters are flattened and routed back to the wire, local `$ref`s resolve, and the
+  observations are real HTTP responses. Pure stdlib, no extra dependency; pass
+  `methods=("get",)` to expose only reads.
+
 ## [0.3.0] - 2026-06-10
 
 ### Added

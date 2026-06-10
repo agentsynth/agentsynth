@@ -32,7 +32,8 @@ tool that runs in an isolated subprocess, a seed-task taxonomy, and YAML recipes
 - [x] `environments/`: pluggable execution backends — SQLite (`sql_query`) and an
       isolated Python subprocess (`python`) are in
 - [x] A browser environment (headless Chromium via Playwright)
-- [ ] More environments: a hardened sandbox (gVisor/e2b-style), a virtual filesystem, REST/OpenAPI
+- [x] A REST environment: any OpenAPI spec becomes runnable tools (`RestEnvironment`)
+- [ ] More environments: a hardened sandbox (gVisor/e2b-style), a virtual filesystem
 - [x] A seed-task taxonomy spanning domains and modes
 - [ ] Self-Instruct / Evol-Instruct expansion of the taxonomy for diversity and difficulty
 - [ ] Persona and environment injection to fight mode collapse
@@ -81,7 +82,8 @@ result.
 
 - [x] **MCP-native generation** — point AgentSynth at any MCP server (stdio or HTTP)
       and its tools become a live environment (`MCPEnvironment`)
-- [ ] Connectors: OpenAPI / REST specs, LangChain and LlamaIndex tool definitions
+- [x] OpenAPI / REST connector (`RestEnvironment`)
+- [ ] Connectors: LangChain and LlamaIndex tool definitions
 - [ ] A plugin interface for custom generators, judges, and environments
 
 ## How to help

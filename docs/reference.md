@@ -30,6 +30,8 @@ The public surface, re-exported from the top-level `agentsynth` package.
 
 ::: agentsynth.BrowserEnvironment
 
+::: agentsynth.RestEnvironment
+
 ## Learned verifier
 
 ::: agentsynth.train_learned_verifier

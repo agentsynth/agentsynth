@@ -348,6 +348,27 @@ env.close()
 Needs `pip install "agentsynth-ai[browser]"` and a one-time `playwright install chromium`
 (Python 3.10+).
 
+### Calling a real API from its OpenAPI spec
+
+`RestEnvironment` turns any OpenAPI spec into runnable tools — every operation becomes
+a tool, calls go over plain HTTP (stdlib, nothing to install), and the observations are
+real response bodies:
+
+```python
+from agentsynth import AgentTrajectoryGenerator
+from agentsynth.environments import RestEnvironment
+
+env = RestEnvironment("https://petstore3.swagger.io/api/v3/openapi.json")
+gen = AgentTrajectoryGenerator(environment=env)
+
+traj = gen.generate("look up pet number 7 and summarize its status")
+print(traj.tool_names_used())   # operation ids from the spec
+```
+
+Pass `methods=("get",)` to expose only reads, and `headers={...}` for auth. See
+[`examples/rest_env.py`](examples/rest_env.py) for a fully offline demo against a
+loopback API.
+
 ---
 
 ## Run the app locally

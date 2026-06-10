@@ -6,6 +6,7 @@ from .base import CompositeEnvironment, Environment
 from .browser import BrowserEnvironment
 from .mcp_env import MCPEnvironment
 from .python_sandbox import PythonSandbox
+from .rest import RestEnvironment
 from .sql import SQLEnvironment
 
 __all__ = [
@@ -15,4 +16,5 @@ __all__ = [
     "PythonSandbox",
     "MCPEnvironment",
     "BrowserEnvironment",
+    "RestEnvironment",
 ]

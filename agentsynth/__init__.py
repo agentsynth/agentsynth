@@ -29,6 +29,7 @@ from .environments import (
     Environment,
     MCPEnvironment,
     PythonSandbox,
+    RestEnvironment,
     SQLEnvironment,
 )
 from .evaluator import TrajectoryEvaluator
@@ -119,6 +120,7 @@ __all__ = [
     "PythonSandbox",
     "MCPEnvironment",
     "BrowserEnvironment",
+    "RestEnvironment",
     # tasks
     "SeedTask",
     "SEED_TASKS",
