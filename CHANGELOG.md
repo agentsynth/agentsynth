@@ -6,6 +6,11 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Trajectories now carry their verification verdict into the exported JSONL (and back
+  on load) when a run uses `verify=True`. Contributed by @Ishant5436 (#21).
+
 ## [0.2.1] - 2026-06-09
 
 ### Added

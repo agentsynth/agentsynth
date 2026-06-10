@@ -35,3 +35,34 @@ def test_recipe_explicit_count_still_caps_queries():
 def test_sql_multistatement_does_not_raise():
     out = SQLEnvironment().execute("sql_query", {"query": "SELECT 1; DROP TABLE sales"})
     assert out.startswith("SQLError")
+
+
+def test_verification_round_trips_through_jsonl(tmp_path):
+    # Verified runs carry the per-trajectory verdict into the JSONL and back (#21).
+    from agentsynth import load_jsonl, to_jsonl
+
+    result = run_recipe(Recipe(num_trajectories=4, vary_modes=True, verify=True))
+    assert all(t.verification is not None for t in result.trajectories)
+
+    path = str(tmp_path / "verified.jsonl")
+    to_jsonl(result.trajectories, path)
+    loaded = load_jsonl(path)
+    assert [t.verification for t in loaded] == [t.verification for t in result.trajectories]
+
+
+def test_jsonl_without_verification_still_loads(tmp_path):
+    import json
+
+    from agentsynth import load_jsonl, to_jsonl
+
+    result = run_recipe(Recipe(num_trajectories=2, evaluate=False))
+    path = str(tmp_path / "plain.jsonl")
+    to_jsonl(result.trajectories, path)
+    # Strip the field to simulate a pre-#21 file.
+    records = [json.loads(line) for line in open(path, encoding="utf-8")]
+    with open(path, "w", encoding="utf-8") as fh:
+        for rec in records:
+            rec.pop("verification", None)
+            fh.write(json.dumps(rec) + "\n")
+    loaded = load_jsonl(path)
+    assert all(t.verification is None for t in loaded)
