@@ -429,6 +429,27 @@ out = gym.step({"answer": "EMEA leads."})       # ends + verifies + scores
 whole loop — GRPO-train a base model against a REST API defined by nothing but its
 OpenAPI spec — on a free Colab T4.
 
+### Close the flywheel — mine failures into the next run
+
+A benchmark tells you *that* the model fails; `mine_failures` turns it into *what to
+generate next*. Misses get categorized (no call / wrong tool / bad arguments — and
+judge dimensions below threshold via `mine_judge_failures`), then the report becomes
+a verified generation run aimed at exactly those gaps:
+
+```python
+from agentsynth import mine_failures, recipe_from_failures, run_recipe
+from agentsynth.benchmarks import BUILTIN_CASES, run_benchmark
+
+report = run_benchmark(my_model, BUILTIN_CASES)
+mined = mine_failures(report, BUILTIN_CASES)
+print(mined.summary_md())                       # what failed, and why
+
+patch = run_recipe(recipe_from_failures(mined, k=200))   # data aimed at the gaps
+```
+
+Generate → verify → train → evaluate → **mine failures** → generate. See
+[`examples/flywheel.py`](examples/flywheel.py) for one full turn of the loop.
+
 **Reference run** (free Colab T4, ~5 min of training): `Llama-3.2-1B` *base* — zero
 function-calling ability — fine-tuned on **275 verified trajectories** goes
 **0% → 58.3%** on the 8-tool selection suite with held-out queries, and **doubles

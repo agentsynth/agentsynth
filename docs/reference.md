@@ -38,6 +38,14 @@ The public surface, re-exported from the top-level `agentsynth` package.
 
 ::: agentsynth.LearnedVerifier
 
+## Flywheel
+
+::: agentsynth.mine_failures
+
+::: agentsynth.mine_judge_failures
+
+::: agentsynth.recipe_from_failures
+
 ## RL
 
 ::: agentsynth.AgentGym

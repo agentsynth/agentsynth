@@ -6,6 +6,13 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Failure mining (`agentsynth.mining`): `mine_failures` categorizes benchmark misses
+  (no call / wrong tool / bad arguments), `mine_judge_failures` flags rubric dimensions
+  below a threshold, and `recipe_from_failures` turns the report into a verified
+  generation run aimed at exactly those gaps — the mine-failures leg of the flywheel.
+
 ## [0.4.0] - 2026-06-11
 
 ### Added

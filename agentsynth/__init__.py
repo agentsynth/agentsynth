@@ -43,6 +43,13 @@ from .exporters import (
 from .generator import AgentTrajectoryGenerator
 from .hub import dataset_card, prepare_dataset_dir, push_dataset
 from .metrics import compute_dataset_metrics, diversity_score
+from .mining import (
+    FailureReport,
+    mine_failures,
+    mine_judge_failures,
+    recipe_from_failures,
+    targeted_queries,
+)
 from .pipelines import Recipe, RunResult, load_recipe, make_environment, run_recipe
 from .preferences import (
     PreferencePair,
@@ -125,6 +132,12 @@ __all__ = [
     # rl
     "AgentGym",
     "make_reward_fn",
+    # flywheel
+    "FailureReport",
+    "mine_failures",
+    "mine_judge_failures",
+    "targeted_queries",
+    "recipe_from_failures",
     # tasks
     "SeedTask",
     "SEED_TASKS",
