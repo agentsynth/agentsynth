@@ -19,6 +19,10 @@
   <a href="CONTRIBUTING.md">Contributing</a>
 </p>
 
+<p align="center">
+  <img alt="AgentSynth demo — generate trajectories, judge them, explore the batch, export the dataset" src="docs/demo.gif" width="800">
+</p>
+
 ---
 
 ## What it is
