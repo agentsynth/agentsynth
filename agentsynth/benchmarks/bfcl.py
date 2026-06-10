@@ -84,18 +84,31 @@ def load_bfcl(questions_path: str, answers_path: Optional[str] = None) -> List[B
     return _build_cases(_read_jsonl(questions_path), answers)
 
 
-def load_sample_bfcl() -> List[BenchmarkCase]:
-    """The bundled 25-case BFCL `simple_python` slice. Runs offline, no download.
+_SAMPLE_FILES = {
+    "simple": "bfcl_sample",  # 25 cases, one candidate function each (format check)
+    "multiple": "bfcl_multiple",  # 25 cases, 2-3 candidate functions (real tool selection)
+}
 
-    A real slice of the Berkeley Function-Calling Leaderboard (Apache-2.0); see
+
+def load_sample_bfcl(split: str = "simple") -> List[BenchmarkCase]:
+    """A bundled 25-case BFCL slice. Runs offline, no download.
+
+    `split="simple"` is the `simple_python` split — one candidate function per case,
+    so it mostly checks output formatting. `split="multiple"` gives each case several
+    candidate functions, which is what actually exercises tool *selection*.
+
+    Real slices of the Berkeley Function-Calling Leaderboard (Apache-2.0); see
     `agentsynth/benchmarks/data/NOTICE.md`. For the full suite, point `load_bfcl`
     at the official BFCL files.
     """
     from importlib.resources import files
 
+    stem = _SAMPLE_FILES.get(split)
+    if stem is None:
+        raise ValueError(f"unknown BFCL sample split {split!r}; use one of {sorted(_SAMPLE_FILES)}")
     data = files("agentsynth.benchmarks") / "data"
-    questions = _parse_jsonl((data / "bfcl_sample.questions.jsonl").read_text(encoding="utf-8"))
-    raw = _parse_jsonl((data / "bfcl_sample.answers.jsonl").read_text(encoding="utf-8"))
+    questions = _parse_jsonl((data / f"{stem}.questions.jsonl").read_text(encoding="utf-8"))
+    raw = _parse_jsonl((data / f"{stem}.answers.jsonl").read_text(encoding="utf-8"))
     return _build_cases(questions, {str(a.get("id")): a for a in raw})
 
 

@@ -18,18 +18,19 @@ from agentsynth.benchmarks import agentsynth_model, load_sample_bfcl, run_benchm
 
 
 def main() -> None:
-    cases = load_sample_bfcl()
     model = agentsynth_model(AgentTrajectoryGenerator(use_mock=True))
-    report = run_benchmark(model, cases=cases)
-
-    print(f"BFCL simple_python slice — {report.n} real cases")
-    print(f"  tool accuracy: {report.tool_accuracy:.1%}")
-    print(f"  arg accuracy:  {report.arg_accuracy:.1%}")
-    print(f"  overall score: {report.score:.1%}")
+    for split in ("simple", "multiple"):
+        cases = load_sample_bfcl(split=split)
+        report = run_benchmark(model, cases=cases)
+        print(f"BFCL {split} slice — {report.n} real cases")
+        print(f"  tool accuracy: {report.tool_accuracy:.1%}")
+        print(f"  arg accuracy:  {report.arg_accuracy:.1%}")
+        print(f"  overall score: {report.score:.1%}\n")
     print(
-        "\nPlug a fine-tuned model in via prompted_model(...) as the 'after' and use\n"
-        "compare_models(...) for a before/after table; point load_bfcl() at the\n"
-        "official BFCL files for the full suite."
+        "The 'multiple' split offers 2-3 candidate functions per case, so it tests\n"
+        "tool *selection*, not just formatting. Plug a fine-tuned model in via\n"
+        "prompted_model(...) and compare_models(...) for a before/after table;\n"
+        "point load_bfcl() at the official BFCL files for the full suite."
     )
 
 

@@ -1,8 +1,10 @@
-# Bundled BFCL sample
+# Bundled BFCL samples
 
-`bfcl_sample.questions.jsonl` and `bfcl_sample.answers.jsonl` are a small slice
-(25 cases) of the **Berkeley Function-Calling Leaderboard (BFCL)** `simple_python`
-split, redistributed here so the benchmark runs out of the box.
+`bfcl_sample.questions.jsonl` / `bfcl_sample.answers.jsonl` (25 cases of the
+`simple_python` split) and `bfcl_multiple.questions.jsonl` /
+`bfcl_multiple.answers.jsonl` (25 cases of the `multiple` split, 2-3 candidate
+functions per case) are small slices of the **Berkeley Function-Calling Leaderboard
+(BFCL)**, redistributed here so the benchmark runs out of the box.
 
 - Source: https://github.com/ShishirPatil/gorilla (`berkeley-function-call-leaderboard`)
 - License: Apache License 2.0 — © the Gorilla / BFCL authors.

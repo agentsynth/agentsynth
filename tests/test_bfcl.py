@@ -72,6 +72,22 @@ def test_run_benchmark_on_the_bfcl_slice():
     assert 0.0 <= report.score <= 1.0
 
 
+def test_load_sample_bfcl_multiple_split_has_candidate_tools():
+    cases = load_sample_bfcl(split="multiple")
+    assert len(cases) == 25
+    # the whole point of this split: every case offers a real choice of tools
+    assert all(len(c.tools) >= 2 for c in cases)
+    for case in cases:
+        assert case.expected_tool in [t["name"] for t in case.tools]
+
+
+def test_load_sample_bfcl_rejects_unknown_split():
+    import pytest as _pytest
+
+    with _pytest.raises(ValueError):
+        load_sample_bfcl(split="nope")
+
+
 def test_tau_bench_reports_missing_package():
     assert tau_bench_available() is False
     with pytest.raises(ImportError):
