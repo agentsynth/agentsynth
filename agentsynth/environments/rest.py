@@ -99,9 +99,22 @@ class RestEnvironment(Environment):
         self._methods = tuple(m.lower() for m in methods) if methods else _HTTP_METHODS
 
         servers = self._spec.get("servers") or []
-        self.base_url = (base_url or (servers[0].get("url") if servers else "") or "").rstrip("/")
-        if not self.base_url:
-            raise ValueError("no base_url given and the spec has no servers[0].url")
+        resolved = base_url or (servers[0].get("url") if servers else "") or ""
+        # Real-world specs often declare a relative servers url (e.g. "/api/v3"),
+        # meaning relative to wherever the spec itself lives.
+        spec_url = (
+            spec if isinstance(spec, str) and spec.startswith(("http://", "https://")) else None
+        )
+        if resolved and not resolved.startswith(("http://", "https://")) and spec_url:
+            resolved = parse.urljoin(spec_url, resolved)
+        self.base_url = resolved.rstrip("/")
+        if not self.base_url.startswith(("http://", "https://")):
+            raise ValueError(
+                "no usable base_url: pass base_url=... explicitly (the spec declares "
+                f"{resolved!r}, which is not absolute)"
+                if resolved
+                else "no base_url given and the spec has no servers[0].url"
+            )
 
         self._tools: List[ToolSpec] = []
         # tool name -> (method, path template, {arg: path|query|body})

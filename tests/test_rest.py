@@ -73,7 +73,11 @@ class _Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         url = urlparse(self.path)
-        if url.path.startswith("/users/"):
+        if url.path == "/openapi.json":
+            # a spec that declares a RELATIVE servers url, like real-world specs do
+            spec = dict(SPEC, servers=[{"url": "/"}])
+            self._send(200, spec)
+        elif url.path.startswith("/users/"):
             user_id = url.path.rsplit("/", 1)[-1]
             verbose = parse_qs(url.query).get("verbose", ["false"])[0]
             self._send(200, {"id": int(user_id), "name": f"user{user_id}", "verbose": verbose})
@@ -164,6 +168,18 @@ def test_methods_filter_drops_writes(api):
 def test_base_url_falls_back_to_the_spec_servers():
     env = RestEnvironment(SPEC)  # no base_url argument
     assert env.base_url == "http://spec-default.example"
+
+
+def test_relative_server_url_resolves_against_the_spec_url(api):
+    # spec fetched over HTTP + relative servers url -> resolved like the Petstore spec
+    env = RestEnvironment(f"{api}/openapi.json")
+    assert env.base_url == api
+    assert '"id": 3' in env.execute("get_user", {"user_id": 3})
+
+
+def test_relative_server_url_without_a_spec_url_is_an_early_error():
+    with pytest.raises(ValueError, match="not absolute"):
+        RestEnvironment(dict(SPEC, servers=[{"url": "/api/v3"}]))
 
 
 def test_spec_from_json_string_and_file(api, tmp_path):
