@@ -11,6 +11,30 @@ Colab T4 handles an 8B 4-bit model with LoRA.
 runs the whole flow (generate → SFT → DPO → benchmark) on a free T4. The CLI steps
 below are the equivalent.
 
+## Reference run (free Colab T4, 2026-06-10)
+
+`unsloth/Llama-3.2-1B` — a **base** model with no instruction tuning and no
+function-calling ability — fine-tuned (4-bit LoRA, 150 steps ≈ 5 minutes) on **275
+verified trajectories** distilled from a mock AgentSynth run (318 trajectories,
+95.9% verified). Both runs use the same answer-priming, so the comparison is fair.
+
+| Built-in suite (12 cases, pick among 8 tools) | Before | After | Δ |
+| --- | --- | --- | --- |
+| Tool accuracy | 0.0% | **58.3%** | +58.3 |
+| Arg accuracy | 0.0% | **58.3%** | +58.3 |
+| Overall | 0.0% | **58.3%** | +58.3 |
+
+On the bundled real BFCL `simple_python` slice the same checkpoint moves tool
+accuracy 60% → 64% — those cases offer a single candidate function, which is nearly
+trivial under answer-priming, so the slice mostly checks formatting. The `multiple`
+split (several candidate functions per case) is the meaningful next test.
+
+The training data here is the deterministic mock generator. Swapping in a real LLM
+generator (set a provider key) produces richer trajectories — especially better
+argument values — and is the expected path to stronger numbers.
+
+The source dataset is public: [agentsynth/agentsynth-trajectories](https://huggingface.co/datasets/agentsynth/agentsynth-trajectories).
+
 ## 0. Offline smoke (no GPU, no keys)
 
 Confirms the whole pipeline wires up before you spend GPU time:

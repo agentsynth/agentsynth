@@ -359,6 +359,13 @@ python scripts/train_sft.py --data data/train.jsonl --dry-run
 `run_benchmark.py --before <base> --after <finetuned>` prints the before/after table.
 Full walkthrough in [docs/BENCHMARK.md](docs/BENCHMARK.md).
 
+**Reference run** (free Colab T4, ~5 min of training): `Llama-3.2-1B` *base* — zero
+function-calling ability — fine-tuned on **275 verified trajectories** goes
+**0% → 58.3%** on the 8-tool selection suite with held-out queries. Reproduce it with
+[`notebooks/agentsynth_finetune.ipynb`](notebooks/agentsynth_finetune.ipynb); the
+source dataset is public at
+[agentsynth/agentsynth-trajectories](https://huggingface.co/datasets/agentsynth/agentsynth-trajectories).
+
 ---
 
 ## Using a real LLM-as-Judge
