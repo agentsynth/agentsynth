@@ -6,6 +6,8 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-06-10
+
 ### Added
 
 - A learned verifier (`train_learned_verifier` / `LearnedVerifier`): distill the LLM
