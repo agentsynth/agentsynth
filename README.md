@@ -424,7 +424,10 @@ out = gym.step({"answer": "EMEA leads."})       # ends + verifies + scores
 `agentsynth.rl.to_openenv(gym)` bridges any gym onto the
 [OpenEnv](https://github.com/meta-pytorch/OpenEnv) standard
 (`pip install "agentsynth-ai[rl]"`, Python 3.10+). See
-[`examples/rl_reward.py`](examples/rl_reward.py).
+[`examples/rl_reward.py`](examples/rl_reward.py), and
+[`notebooks/agentsynth_rl_grpo.ipynb`](notebooks/agentsynth_rl_grpo.ipynb) runs the
+whole loop — GRPO-train a base model against a REST API defined by nothing but its
+OpenAPI spec — on a free Colab T4.
 
 **Reference run** (free Colab T4, ~5 min of training): `Llama-3.2-1B` *base* — zero
 function-calling ability — fine-tuned on **275 verified trajectories** goes
