@@ -38,6 +38,14 @@ The public surface, re-exported from the top-level `agentsynth` package.
 
 ::: agentsynth.LearnedVerifier
 
+## RL
+
+::: agentsynth.AgentGym
+
+::: agentsynth.make_reward_fn
+
+::: agentsynth.rl.to_openenv
+
 ## Benchmark
 
 ::: agentsynth.run_benchmark

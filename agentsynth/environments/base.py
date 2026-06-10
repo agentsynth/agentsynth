@@ -22,7 +22,12 @@ class Environment(ABC):
 
     @abstractmethod
     def execute(self, tool_name: str, args: Dict[str, Any]) -> str:
-        """Run a tool call and return the observation text."""
+        """Run a tool call and return the observation text.
+
+        Failures should come back as observation strings ("SQLError: ...") so the
+        agent can read them; raising for an unknown tool is also fine — callers in
+        the RL and generation layers tolerate both.
+        """
 
     def sample_args(self, tool_name: str, query: str, seed: int) -> Dict[str, Any]:
         """A valid example call for `tool_name`, so generated calls actually run.

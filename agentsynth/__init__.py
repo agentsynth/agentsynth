@@ -50,6 +50,7 @@ from .preferences import (
     load_dpo_jsonl,
     to_dpo_jsonl,
 )
+from .rl import AgentGym, make_reward_fn
 from .schemas import (
     DEFAULT_RUBRIC_WEIGHTS,
     RUBRIC_DIMENSIONS,
@@ -121,6 +122,9 @@ __all__ = [
     "MCPEnvironment",
     "BrowserEnvironment",
     "RestEnvironment",
+    # rl
+    "AgentGym",
+    "make_reward_fn",
     # tasks
     "SeedTask",
     "SEED_TASKS",

@@ -46,6 +46,8 @@ mcp = ["mcp>=1.2"]
 browser = ["playwright>=1.40"]
 # Distill the LLM judge into a cheap classifier (LearnedVerifier).
 learned = ["scikit-learn>=1.3"]
+# Bridge AgentGym episodes onto the OpenEnv RL standard (Python 3.10+).
+rl = ["openenv-core>=0.3; python_version >= '3.10'"]
 # Push datasets to the Hugging Face Hub.
 hub = ["huggingface-hub>=0.23", "datasets>=2.18"]
 # Fine-tuning scripts (SFT + DPO). GPU recommended; `unsloth` is optional on top.

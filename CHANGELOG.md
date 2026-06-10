@@ -8,6 +8,12 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- An RL layer (`agentsynth.rl`): `AgentGym` runs gym-style episodes over any
+  environment — tool calls execute for real and the terminal reward comes from
+  verification + the judge; `make_reward_fn` plugs the same checks straight into TRL's
+  `GRPOTrainer` as a reward function; `to_openenv` bridges a gym onto the OpenEnv
+  standard (`agentsynth-ai[rl]`, Python 3.10+); `episodes_to_grpo_jsonl` exports
+  episodes for offline methods.
 - `RestEnvironment` (`environments/`): turn any OpenAPI spec (dict, JSON/YAML string,
   file path, or URL) into runnable tools — operations become tools, path/query/JSON-body
   parameters are flattened and routed back to the wire, local `$ref`s resolve, and the

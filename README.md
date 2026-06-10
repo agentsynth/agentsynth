@@ -399,6 +399,33 @@ python scripts/train_sft.py --data data/train.jsonl --dry-run
 `run_benchmark.py --before <base> --after <finetuned>` prints the before/after table.
 Full walkthrough in [docs/BENCHMARK.md](docs/BENCHMARK.md).
 
+### Train with RL — verified rewards
+
+Environments and evals are the new datasets — and OpenEnv, the emerging standard for
+RL environments, deliberately leaves reward definition to libraries that specialize in
+it. That's AgentSynth's home turf: `agentsynth.rl` turns any environment into gym-style
+episodes whose rewards come from real execution + verification, not vibes.
+
+```python
+from agentsynth import AgentGym, make_reward_fn
+from agentsynth.environments import SQLEnvironment
+
+# Gym-style episodes: tool calls execute for real; the terminal reward is
+# verification.score + the judge, both grounded in what actually happened.
+gym = AgentGym(SQLEnvironment(), task="Which region has the highest revenue?")
+obs = gym.reset()
+out = gym.step({"tool_name": "sql_query", "arguments": {"query": "SELECT ..."}})
+out = gym.step({"answer": "EMEA leads."})       # ends + verifies + scores
+
+# Or plug the verification stack straight into TRL as a reward function:
+# GRPOTrainer(model, reward_funcs=make_reward_fn(environment=env), ...)
+```
+
+`agentsynth.rl.to_openenv(gym)` bridges any gym onto the
+[OpenEnv](https://github.com/meta-pytorch/OpenEnv) standard
+(`pip install "agentsynth-ai[rl]"`, Python 3.10+). See
+[`examples/rl_reward.py`](examples/rl_reward.py).
+
 **Reference run** (free Colab T4, ~5 min of training): `Llama-3.2-1B` *base* — zero
 function-calling ability — fine-tuned on **275 verified trajectories** goes
 **0% → 58.3%** on the 8-tool selection suite with held-out queries, and **doubles

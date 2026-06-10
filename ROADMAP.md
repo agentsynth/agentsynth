@@ -83,6 +83,8 @@ result.
 - [x] **MCP-native generation** — point AgentSynth at any MCP server (stdio or HTTP)
       and its tools become a live environment (`MCPEnvironment`)
 - [x] OpenAPI / REST connector (`RestEnvironment`)
+- [x] **RL-native**: gym-style episodes with verified rewards over any environment,
+      TRL-compatible reward functions, and an OpenEnv bridge (`agentsynth.rl`)
 - [ ] Connectors: LangChain and LlamaIndex tool definitions
 - [ ] A plugin interface for custom generators, judges, and environments
 
