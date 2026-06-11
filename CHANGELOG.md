@@ -6,6 +6,8 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-06-11
+
 ### Added
 
 - Reward integrity for the learned verifier: `train_learned_verifier(calibrate=True)`

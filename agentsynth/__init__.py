@@ -10,7 +10,7 @@ LLM-as-Judge loop. Runs offline against a mock by default.
 
 from __future__ import annotations
 
-__version__ = "0.4.0"
+__version__ = "0.5.0"
 
 from .benchmarks import (
     BUILTIN_CASES,
