@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AgentSynth — agent training data you can verify</title>
+<meta name="description" content="AgentSynth generates synthetic tool-use trajectories, checks them against the world's end state, and turns them into RL rewards, benchmarks, and a live leaderboard. Offline-first, open source.">
+<meta property="og:title" content="AgentSynth — agent training data you can verify">
+<meta property="og:description" content="Outcome-verified synthetic agent trajectories for fine-tuning agentic LLMs. Open source.">
+<meta property="og:type" content="website">
+<style>
+  :root{
+    --bg:#ffffff; --ink:#11141a; --muted:#5b6471; --line:#e7e9ee;
+    --accent:#4f46e5; --accent-soft:#eef0fe; --code-bg:#0e1117; --code-ink:#e6edf3;
+    --ok:#0f9d58;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:16px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    -webkit-font-smoothing:antialiased}
+  a{color:var(--accent);text-decoration:none}
+  a:hover{text-decoration:underline}
+  .wrap{max-width:960px;margin:0 auto;padding:0 20px}
+  header{border-bottom:1px solid var(--line)}
+  nav{display:flex;align-items:center;justify-content:space-between;height:64px}
+  .brand{font-weight:700;font-size:18px;letter-spacing:-.01em}
+  .brand b{color:var(--accent)}
+  nav .links a{color:var(--ink);margin-left:22px;font-size:15px}
+  nav .links a:hover{color:var(--accent)}
+  .hero{padding:84px 0 56px;text-align:center;
+    background:radial-gradient(1100px 380px at 50% -120px,var(--accent-soft),#fff 70%)}
+  .hero h1{font-size:46px;line-height:1.08;letter-spacing:-.03em;margin:0 0 18px;font-weight:800}
+  .hero p.lede{font-size:20px;color:var(--muted);max-width:620px;margin:0 auto 30px}
+  .cta{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+  .btn{display:inline-block;padding:12px 20px;border-radius:9px;font-weight:600;font-size:15px;border:1px solid var(--line)}
+  .btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+  .btn.primary:hover{background:#4338ca;text-decoration:none}
+  .btn.ghost:hover{border-color:var(--accent);color:var(--accent);text-decoration:none}
+  .pill{display:inline-block;background:var(--accent-soft);color:var(--accent);
+    font-size:13px;font-weight:600;padding:5px 12px;border-radius:999px;margin-bottom:22px}
+  section{padding:54px 0;border-top:1px solid var(--line)}
+  h2{font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:0 0 24px;font-weight:700}
+  .why{font-size:22px;line-height:1.5;letter-spacing:-.01em;max-width:760px}
+  .why b{color:var(--ink)}
+  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
+  .card{border:1px solid var(--line);border-radius:12px;padding:20px}
+  .card h3{margin:0 0 8px;font-size:16px}
+  .card p{margin:0;color:var(--muted);font-size:14.5px}
+  .proof{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+  .stat{border:1px solid var(--line);border-radius:12px;padding:22px}
+  .stat .n{font-size:30px;font-weight:800;letter-spacing:-.02em}
+  .stat .n .arrow{color:var(--muted);font-weight:600}
+  .stat .n .after{color:var(--ok)}
+  .stat .l{color:var(--muted);font-size:14px;margin-top:6px}
+  pre{background:var(--code-bg);color:var(--code-ink);border-radius:12px;padding:18px 20px;overflow:auto;
+    font:13.5px/1.55 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;margin:0 0 16px}
+  pre .c{color:#7d8aa3}
+  pre .k{color:#c792ea}
+  pre .s{color:#a6e3a1}
+  footer{border-top:1px solid var(--line);padding:34px 0 60px;color:var(--muted);font-size:14px}
+  footer .links a{margin-right:18px;color:var(--ink)}
+  footer .links a:hover{color:var(--accent)}
+  footer .fine{margin-top:14px}
+  @media(max-width:720px){
+    .hero h1{font-size:34px}.grid{grid-template-columns:1fr}.proof{grid-template-columns:1fr}
+    nav .links a:not(.gh){display:none}
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap"><nav>
+    <span class="brand">Agent<b>Synth</b></span>
+    <span class="links">
+      <a href="/leaderboard">Leaderboard</a>
+      <a href="https://agentsynth.github.io/agentsynth/">Docs</a>
+      <a class="gh" href="https://github.com/agentsynth/agentsynth">GitHub</a>
+    </span>
+  </nav></div>
+</header>
+
+<div class="hero">
+  <div class="wrap">
+    <span class="pill">Open source · offline-first</span>
+    <h1>Agent training data<br>you can verify.</h1>
+    <p class="lede">AgentSynth generates synthetic tool-use trajectories, checks them against the
+      world's end state, and turns them into RL rewards, benchmarks, and a live leaderboard.</p>
+    <div class="cta">
+      <a class="btn primary" href="https://github.com/agentsynth/agentsynth">Star on GitHub</a>
+      <a class="btn ghost" href="/leaderboard">See the live leaderboard</a>
+    </div>
+  </div>
+</div>
+
+<section>
+  <div class="wrap">
+    <p class="why">Most synthetic agent data is graded on vibes. AgentSynth grades on
+      <b>outcomes</b>: a trajectory passes only when the database, API, or sandbox actually
+      ends up in the goal state — so the reward can't be farmed by a model that just says it did the work.</p>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>What's in the box</h2>
+    <div class="grid">
+      <div class="card"><h3>Outcome verification</h3><p>Checkers assert on the world's end state, not the text. No grounding, no credit.</p></div>
+      <div class="card"><h3>7 real environments</h3><p>SQL, Python, Docker, MCP, Browser, REST/OpenAPI, Composite — the tools actually execute.</p></div>
+      <div class="card"><h3>RL-ready rewards</h3><p>Verified reward functions for TRL GRPO, plus an OpenEnv bridge for gym-style episodes.</p></div>
+      <div class="card"><h3>Import production traces</h3><p>OpenAI, Anthropic, and OpenTelemetry GenAI spans become replayable trajectories.</p></div>
+      <div class="card"><h3>Cheap, calibrated verify</h3><p>A learned verifier distilled from judge labels routes only the borderline cases to an LLM.</p></div>
+      <div class="card"><h3>Industrial scale</h3><p>Disk cache, a hard budget cap, resumable runs, and MinHash dedup at the 100k scale.</p></div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>Measured honestly</h2>
+    <div class="proof">
+      <div class="stat">
+        <div class="n"><span>0%</span> <span class="arrow">→</span> <span class="after">58.3%</span></div>
+        <div class="l">Llama-3.2-1B fine-tuned on AgentSynth data, built-in tool suite (pick among 8 tools).</div>
+      </div>
+      <div class="stat">
+        <div class="n"><span>16%</span> <span class="arrow">→</span> <span class="after">38%</span></div>
+        <div class="l">BFCL <code>multiple</code> overall — unseen candidate functions, real tool selection (tool accuracy 24% → 48%).</div>
+      </div>
+    </div>
+    <p style="color:var(--muted);font-size:14px;margin-top:16px">
+      Reproduce both in the <a href="https://github.com/agentsynth/agentsynth/blob/main/notebooks/agentsynth_finetune.ipynb">free-GPU notebook</a>.
+      The flagship dataset is public on the <a href="https://huggingface.co/datasets/agentsynth/agentsynth-trajectories">Hugging Face Hub</a>.</p>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>Start in two lines</h2>
+    <pre><span class="c"># offline mock by default — no API keys needed</span>
+pip install agentsynth-ai</pre>
+    <pre><span class="k">from</span> agentsynth <span class="k">import</span> AgentTrajectoryGenerator, TrajectoryEvaluator
+
+gen = AgentTrajectoryGenerator()
+traj = gen.generate(<span class="s">"Refund order 7 in the orders database, then confirm"</span>)
+score = TrajectoryEvaluator().evaluate(traj)</pre>
+    <p style="color:var(--muted);font-size:14px;margin:4px 0 16px">Then run a model through the outcome-checked pack and put it on the board:</p>
+    <pre>agentsynth bench --pack packs/core_v1.yaml --model &lt;your-model&gt; \
+    --submit https://api.agentsynth.tech</pre>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div class="links">
+      <a href="https://github.com/agentsynth/agentsynth">GitHub</a>
+      <a href="https://pypi.org/project/agentsynth-ai/">PyPI</a>
+      <a href="https://agentsynth.github.io/agentsynth/">Docs</a>
+      <a href="https://huggingface.co/datasets/agentsynth/agentsynth-trajectories">Dataset</a>
+      <a href="https://huggingface.co/spaces/agentsynth/agentsynth">Live demo</a>
+      <a href="/leaderboard">Leaderboard</a>
+    </div>
+    <div class="fine">MIT licensed · <code>pip install agentsynth-ai</code> · built in the open.</div>
+  </div>
+</footer>
+</body>
+</html>

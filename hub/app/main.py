@@ -96,6 +96,17 @@ def _rate_limited(ip: str) -> bool:
     return len(window) > MAX_SUBMISSIONS_PER_HOUR
 
 
+_INDEX_HTML = ""
+_index_file = Path(__file__).resolve().parent / "index.html"
+if _index_file.exists():
+    _INDEX_HTML = _index_file.read_text(encoding="utf-8")
+
+
+@app.get("/", response_class=HTMLResponse)
+def home() -> str:
+    return _INDEX_HTML or "<h1>AgentSynth</h1><p><a href='/leaderboard'>Leaderboard</a></p>"
+
+
 @app.get("/healthz")
 def healthz() -> dict:
     with engine.connect() as conn:
