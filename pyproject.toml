@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "agentsynth-ai"
-version = "0.6.1"
+version = "0.6.2"
 description = "Synthetic Agentic Trajectories Generator + LLM-as-Judge Eval Loop for fine-tuning agentic LLMs"
 readme = "README.md"
 requires-python = ">=3.9"
@@ -35,6 +35,7 @@ classifiers = [
 # Core install (`pip install agentsynth-ai`) stays light: just generate + export.
 dependencies = [
     "pydantic>=2.5",
+    "pyyaml>=6.0",
 ]
 
 [project.optional-dependencies]
