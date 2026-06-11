@@ -366,8 +366,16 @@ def _post_json(url: str, payload: Dict) -> str:
     import json
     from urllib import error, request
 
+    from . import __version__
+
     data = json.dumps(payload).encode("utf-8")
-    req = request.Request(url, data=data, headers={"Content-Type": "application/json"})
+    # Some WAFs (Cloudflare among them) block the default urllib user-agent, so
+    # identify the client by name instead.
+    headers = {
+        "Content-Type": "application/json",
+        "User-Agent": f"agentsynth/{__version__}",
+    }
+    req = request.Request(url, data=data, headers=headers)
     try:
         with request.urlopen(req, timeout=30) as resp:
             return resp.read().decode("utf-8", "replace")
