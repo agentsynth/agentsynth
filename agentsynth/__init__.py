@@ -59,6 +59,7 @@ from .preferences import (
     to_dpo_jsonl,
 )
 from .rl import AgentGym, make_reward_fn
+from .scale import BudgetExceeded, CachingLLMClient, CostMeter, run_resumable
 from .scenarios import (
     AnswerContains,
     CalledTool,
@@ -143,6 +144,11 @@ __all__ = [
     # rl
     "AgentGym",
     "make_reward_fn",
+    # scale
+    "CachingLLMClient",
+    "CostMeter",
+    "BudgetExceeded",
+    "run_resumable",
     # scenarios
     "Scenario",
     "SqlCheck",

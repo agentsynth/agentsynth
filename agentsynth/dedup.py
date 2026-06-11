@@ -50,25 +50,79 @@ class DedupResult:
     duplicates: List[Tuple[str, str, float]] = field(default_factory=list)
 
 
+_MERSENNE = (1 << 61) - 1
+
+
+def _minhash_signature(shingles: Set[str], num_perm: int, seed: int = 7) -> Tuple[int, ...]:
+    """A stable MinHash signature; identical inputs give identical signatures."""
+    import hashlib
+    import random
+
+    rng = random.Random(seed)
+    coeffs = [(rng.randrange(1, _MERSENNE), rng.randrange(0, _MERSENNE)) for _ in range(num_perm)]
+    hashes = [
+        int.from_bytes(hashlib.md5(s.encode("utf-8")).digest()[:8], "big") for s in shingles
+    ] or [0]
+    return tuple(min((a * h + b) % _MERSENNE for h in hashes) for a, b in coeffs)
+
+
 def dedup_trajectories(
     trajectories: List[Trajectory],
     threshold: float = 0.85,
     shingle_k: int = 3,
     key: Optional[Callable[[Trajectory], str]] = None,
+    method: str = "pairwise",
+    num_perm: int = 64,
+    bands: int = 16,
 ) -> DedupResult:
     """Drop trajectories that are near-identical to one already kept.
 
     Similarity is Jaccard over shingles of `key(trajectory)`, which defaults to the
     full example (query + tool sequence + answer). Pass `key=lambda t: t.query` for
     prompt-level dedup instead.
+
+    `method="pairwise"` (default) compares against everything kept — exact but
+    O(n²), fine into the low thousands. `method="minhash"` buckets by MinHash/LSH
+    bands first and only Jaccard-verifies bucket collisions, which scales to the
+    100k range; near-duplicates below the band sensitivity can slip through, so
+    keep `threshold` high (≥0.8) with the defaults.
     """
     key = key or _content
     result = DedupResult()
+
+    if method == "minhash":
+        rows = num_perm // bands or 1
+        buckets: dict = {}
+        kept_by_id: dict = {}
+        for traj in trajectories:
+            shingles = _shingles(key(traj), shingle_k)
+            signature = _minhash_signature(shingles, num_perm)
+            band_keys = [
+                (band, signature[band * rows : (band + 1) * rows]) for band in range(bands)
+            ]
+            candidates = {cid for bk in band_keys for cid in buckets.get(bk, ())}
+            best_sim = 0.0
+            best_kept: Optional[Trajectory] = None
+            for cid in candidates:
+                kept_traj, kept_sh = kept_by_id[cid]
+                sim = jaccard(shingles, kept_sh)
+                if sim >= threshold and sim > best_sim:
+                    best_sim, best_kept = sim, kept_traj
+            if best_kept is not None:
+                result.removed.append(traj)
+                result.duplicates.append((traj.id, best_kept.id, round(best_sim, 3)))
+            else:
+                result.kept.append(traj)
+                kept_by_id[traj.id] = (traj, shingles)
+                for bk in band_keys:
+                    buckets.setdefault(bk, []).append(traj.id)
+        return result
+
     kept_shingles: List[Tuple[Trajectory, Set[str]]] = []
     for traj in trajectories:
         shingles = _shingles(key(traj), shingle_k)
         best_sim = 0.0
-        best_kept: Optional[Trajectory] = None
+        best_kept = None
         for kept_traj, kept_sh in kept_shingles:
             sim = jaccard(shingles, kept_sh)
             if sim >= threshold and sim > best_sim:

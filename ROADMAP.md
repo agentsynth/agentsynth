@@ -41,7 +41,7 @@ tool that runs in an isolated subprocess, a seed-task taxonomy, and YAML recipes
 - [ ] Self-Instruct / Evol-Instruct expansion of the taxonomy for diversity and difficulty
 - [ ] Persona and environment injection to fight mode collapse
 - [x] Concurrent batches via a recipe runner (`max_workers`)
-- [ ] Cost tracking, caching, and resumable runs
+- [x] Cost tracking, caching, budget caps, and resumable runs (`agentsynth.scale`)
 - [x] Declarative YAML run recipes
 - [ ] Local-model backend (vLLM / Ollama) for cheap bulk generation
 - [ ] **good first issue:** more built-in tool catalogs and seed tasks (finance, devops, support, research)
@@ -59,7 +59,8 @@ presets, DPO pairs, and dedup/decontamination.
 - [ ] Judge calibration against human labels
 - [x] Preference pairs (chosen / rejected) for DPO, with TRL-compatible export
 - [x] Near-duplicate removal (Jaccard shingles) and benchmark decontamination
-- [ ] Stronger dedup (MinHash / embeddings) and end-to-end provenance tracking
+- [x] MinHash/LSH dedup for the 100k scale
+- [ ] Embedding dedup and end-to-end provenance tracking
 
 ## Proof and distribution
 

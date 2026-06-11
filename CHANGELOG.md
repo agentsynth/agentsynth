@@ -8,6 +8,11 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Industrial-scale generation (`agentsynth.scale`): `CachingLLMClient` (disk cache,
+  retries with backoff, token/cost meter, hard `budget_usd` cap, rate limiting) and
+  `run_resumable` (incremental JSONL + state file — crashed runs continue where they
+  stopped, `max_items` enables chunked/cron runs). `dedup_trajectories` gains
+  `method="minhash"` LSH for linear-time near-duplicate removal at the 100k scale.
 - Scenarios (`agentsynth.scenarios`): a serializable bundle of environment config
   (with per-episode seed state), task, and **outcome checkers** that assert on the
   world's end state — `SqlCheck`, `HttpCheck`, `CalledTool`, `AnswerContains`.

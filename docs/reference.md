@@ -38,6 +38,12 @@ The public surface, re-exported from the top-level `agentsynth` package.
 
 ::: agentsynth.LearnedVerifier
 
+## Scale
+
+::: agentsynth.CachingLLMClient
+
+::: agentsynth.run_resumable
+
 ## Scenarios
 
 ::: agentsynth.Scenario

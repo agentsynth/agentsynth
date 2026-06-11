@@ -441,6 +441,28 @@ out = gym.step({"answer": "EMEA leads."})       # ends + verifies + scores
 whole loop — GRPO-train a base model against a REST API defined by nothing but its
 OpenAPI spec — on a free Colab T4.
 
+### Run it like a job — cache, retries, budgets, resume
+
+Real-LLM runs at the 10k scale need plumbing, not heroics. `CachingLLMClient` adds a
+disk cache (re-runs replay for free), exponential-backoff retries, a token/cost meter,
+a hard budget cap, and a rate limiter; `run_resumable` writes trajectories
+incrementally with a state file, so a crashed or Ctrl-C'd run continues where it
+stopped. Local backends (Ollama, vLLM) work through LiteLLM model strings:
+
+```python
+from agentsynth import AgentTrajectoryGenerator, CachingLLMClient, CostMeter, Recipe, run_resumable
+
+meter = CostMeter()
+client = CachingLLMClient("claude-haiku-4-5-20251001", cache_dir=".agentsynth_cache",
+                          budget_usd=25.0, meter=meter)
+run_resumable(Recipe(num_trajectories=10_000, verify=True), "runs/flagship",
+              llm_client=client)
+print(meter.report())    # calls, tokens, dollars
+```
+
+MinHash dedup (`dedup_trajectories(..., method="minhash")`) keeps near-duplicate
+removal linear at that scale.
+
 ### Scenarios — verify the outcome, not the vibes
 
 A scenario bundles a world (an environment with its own seed state, rebuilt every
