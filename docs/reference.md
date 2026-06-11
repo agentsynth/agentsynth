@@ -38,6 +38,14 @@ The public surface, re-exported from the top-level `agentsynth` package.
 
 ::: agentsynth.LearnedVerifier
 
+## Trace import
+
+::: agentsynth.trajectory_from_messages
+
+::: agentsynth.import_traces
+
+::: agentsynth.load_traces_jsonl
+
 ## Flywheel
 
 ::: agentsynth.mine_failures

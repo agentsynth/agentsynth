@@ -429,6 +429,21 @@ out = gym.step({"answer": "EMEA leads."})       # ends + verifies + scores
 whole loop — GRPO-train a base model against a REST API defined by nothing but its
 OpenAPI spec — on a free Colab T4.
 
+### Import your production traces
+
+Your agent's logs are already a dataset — these make them trainable. OpenAI-style
+`tool_calls` logs and Anthropic `tool_use` blocks both import into `Trajectory`
+objects, so the whole stack applies to real traffic: judge it, verify it, dedup it,
+mine its failures, export SFT/DPO.
+
+```python
+from agentsynth import TrajectoryEvaluator, load_traces_jsonl
+
+trajectories = load_traces_jsonl("prod_logs.jsonl")      # format auto-detected
+results = TrajectoryEvaluator().evaluate_batch(trajectories)
+keep = [t for t, r in zip(trajectories, results) if r.passed]
+```
+
 ### Close the flywheel — mine failures into the next run
 
 A benchmark tells you *that* the model fails; `mine_failures` turns it into *what to

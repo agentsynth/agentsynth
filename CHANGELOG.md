@@ -8,6 +8,11 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Trace importers (`agentsynth.importers`): convert real agent logs — OpenAI-style
+  `tool_calls` messages and Anthropic `tool_use`/`tool_result` blocks — into
+  `Trajectory` objects (`import_traces`, `load_traces_jsonl`, format auto-detected),
+  so judging, verification, dedup, failure mining, and SFT/DPO export all apply to
+  production traffic.
 - Failure mining (`agentsynth.mining`): `mine_failures` categorizes benchmark misses
   (no call / wrong tool / bad arguments), `mine_judge_failures` flags rubric dimensions
   below a threshold, and `recipe_from_failures` turns the report into a verified

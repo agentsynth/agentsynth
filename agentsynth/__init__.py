@@ -42,6 +42,7 @@ from .exporters import (
 )
 from .generator import AgentTrajectoryGenerator
 from .hub import dataset_card, prepare_dataset_dir, push_dataset
+from .importers import import_traces, load_traces_jsonl, trajectory_from_messages
 from .metrics import compute_dataset_metrics, diversity_score
 from .mining import (
     FailureReport,
@@ -132,6 +133,10 @@ __all__ = [
     # rl
     "AgentGym",
     "make_reward_fn",
+    # importers
+    "import_traces",
+    "load_traces_jsonl",
+    "trajectory_from_messages",
     # flywheel
     "FailureReport",
     "mine_failures",

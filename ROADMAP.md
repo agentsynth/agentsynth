@@ -87,6 +87,7 @@ result.
 - [x] OpenAPI / REST connector (`RestEnvironment`)
 - [x] **RL-native**: gym-style episodes with verified rewards over any environment,
       TRL-compatible reward functions, and an OpenEnv bridge (`agentsynth.rl`)
+- [x] Trace importers: OpenAI / Anthropic agent logs become verifiable trajectories
 - [ ] Connectors: LangChain and LlamaIndex tool definitions
 - [ ] A plugin interface for custom generators, judges, and environments
 
