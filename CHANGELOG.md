@@ -8,6 +8,10 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Reward integrity for the learned verifier: `train_learned_verifier(calibrate=True)`
+  runs sigmoid calibration and every report now carries a `brier` score, and
+  `route_by_confidence` splits a batch into auto-fail / needs-judge / auto-pass bands
+  so the LLM judge is only spent on the borderline cases.
 - Trace importers (`agentsynth.importers`): convert real agent logs — OpenAI-style
   `tool_calls` messages and Anthropic `tool_use`/`tool_result` blocks — into
   `Trajectory` objects (`import_traces`, `load_traces_jsonl`, format auto-detected),

@@ -77,3 +77,43 @@ def test_single_class_labels_raise(judged_batch):
     trajs, results = judged_batch
     with pytest.raises(ValueError):
         train_learned_verifier(trajs, results, threshold=0.0)  # everything passes
+
+
+def test_calibrated_training_reports_brier(judged_batch):
+    pytest.importorskip("sklearn")
+    from agentsynth import train_learned_verifier
+
+    trajs, results = judged_batch
+    median = statistics.median(r.overall for r in results)
+    _, plain = train_learned_verifier(trajs, results, threshold=median)
+    verifier, calibrated = train_learned_verifier(trajs, results, threshold=median, calibrate=True)
+
+    for report in (plain, calibrated):
+        assert 0.0 <= report["brier"] <= 1.0
+    assert plain["calibrated"] is False and calibrated["calibrated"] is True
+    assert 0.0 <= verifier.predict_proba(trajs[0]) <= 1.0
+
+
+def test_route_by_confidence_partitions_the_batch(judged_batch):
+    pytest.importorskip("sklearn")
+    from agentsynth import train_learned_verifier
+    from agentsynth.verification import route_by_confidence
+
+    trajs, results = judged_batch
+    median = statistics.median(r.overall for r in results)
+    verifier, _ = train_learned_verifier(trajs, results, threshold=median)
+
+    bands = route_by_confidence(verifier, trajs, low=0.3, high=0.7)
+    assert set(bands) == {"auto_fail", "needs_judge", "auto_pass"}
+    assert sum(len(v) for v in bands.values()) == len(trajs)  # complete partition
+    for traj in bands["auto_pass"]:
+        assert verifier.predict_proba(traj) >= 0.7
+    for traj in bands["auto_fail"]:
+        assert verifier.predict_proba(traj) < 0.3
+
+    # the whole point: a wider band sends more to the judge, never fewer
+    wider = route_by_confidence(verifier, trajs, low=0.1, high=0.9)
+    assert len(wider["needs_judge"]) >= len(bands["needs_judge"])
+
+    with pytest.raises(ValueError):
+        route_by_confidence(verifier, trajs, low=0.8, high=0.2)

@@ -140,6 +140,7 @@ def train_learned_verifier(
     eval_results: Sequence[EvalResult],
     threshold: Optional[float] = None,
     test_size: float = 0.25,
+    calibrate: bool = False,
     seed: int = 7,
 ) -> Tuple[LearnedVerifier, Dict[str, Any]]:
     """Fit a LearnedVerifier on judge labels and report held-out agreement.
@@ -147,8 +148,12 @@ def train_learned_verifier(
     Labels come from each eval result's `passed` flag, or `overall >= threshold`
     when `threshold` is given. Returns `(verifier, report)` where the report has
     `agreement` (held-out accuracy vs the judge), `precision`/`recall` for the
-    pass class, and the split sizes. Raises ValueError when the labels are all
-    one class — vary the rubric or threshold so there is something to learn.
+    pass class, `brier` (mean squared error of the probabilities — lower means
+    the confidence is trustworthy, which matters when you route on it), and the
+    split sizes. With `calibrate=True` the probabilities go through sigmoid
+    calibration (cross-validated), which usually buys a better brier at the same
+    agreement. Raises ValueError when the labels are all one class — vary the
+    rubric or threshold so there is something to learn.
     """
     try:
         from sklearn.linear_model import LogisticRegression
@@ -182,16 +187,22 @@ def train_learned_verifier(
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=test_size, random_state=seed, stratify=y
     )
-    model = make_pipeline(
+    model: Any = make_pipeline(
         StandardScaler(), LogisticRegression(max_iter=1000, class_weight="balanced")
     )
+    if calibrate:
+        from sklearn.calibration import CalibratedClassifierCV
+
+        model = CalibratedClassifierCV(model, method="sigmoid", cv=3)
     model.fit(X_train, y_train)
 
     predictions = model.predict(X_test)
+    probabilities = [float(p[1]) for p in model.predict_proba(X_test)]
     true_pass = sum(1 for p, t in zip(predictions, y_test) if p == 1 and t == 1)
     agreement = sum(1 for p, t in zip(predictions, y_test) if p == t) / len(y_test)
     precision = true_pass / max(1, sum(1 for p in predictions if p == 1))
     recall = true_pass / max(1, sum(1 for t in y_test if t == 1))
+    brier = sum((p - t) ** 2 for p, t in zip(probabilities, y_test)) / len(y_test)
 
     report = {
         "n": len(y),
@@ -201,9 +212,38 @@ def train_learned_verifier(
         "agreement": round(agreement, 4),
         "precision": round(precision, 4),
         "recall": round(recall, 4),
+        "brier": round(brier, 4),
+        "calibrated": calibrate,
         "features": list(FEATURE_NAMES),
     }
     return LearnedVerifier(model), report
+
+
+def route_by_confidence(
+    verifier: LearnedVerifier,
+    trajectories: Sequence[Trajectory],
+    low: float = 0.3,
+    high: float = 0.7,
+) -> Dict[str, List[Trajectory]]:
+    """Spend the judge only where the cheap screen is unsure.
+
+    Splits a batch into `auto_fail` (p(pass) < low), `needs_judge` (the borderline
+    band), and `auto_pass` (p(pass) >= high). With a calibrated verifier the band
+    edges mean what they say — run the real LLM judge over `needs_judge` only and
+    you keep most of its signal for a fraction of the cost.
+    """
+    if not 0.0 <= low <= high <= 1.0:
+        raise ValueError("thresholds must satisfy 0 <= low <= high <= 1")
+    bands: Dict[str, List[Trajectory]] = {"auto_fail": [], "needs_judge": [], "auto_pass": []}
+    for trajectory in trajectories:
+        proba = verifier.predict_proba(trajectory)
+        if proba < low:
+            bands["auto_fail"].append(trajectory)
+        elif proba >= high:
+            bands["auto_pass"].append(trajectory)
+        else:
+            bands["needs_judge"].append(trajectory)
+    return bands
 
 
 __all__ = [
@@ -211,4 +251,5 @@ __all__ = [
     "extract_features",
     "LearnedVerifier",
     "train_learned_verifier",
+    "route_by_confidence",
 ]

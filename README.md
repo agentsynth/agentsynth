@@ -303,6 +303,18 @@ print(report["agreement"])               # held-out agreement with the LLM judge
 verify_trajectory(traj, verifiers=[verifier])   # plugs in like any other check
 ```
 
+Train with `calibrate=True` and the probabilities mean what they say (the report
+carries a brier score), which makes confidence routing safe — auto-accept the clear
+passes, auto-drop the clear fails, and spend the real judge only on the borderline
+band:
+
+```python
+from agentsynth.verification import route_by_confidence
+
+bands = route_by_confidence(verifier, trajectories, low=0.3, high=0.7)
+judged = TrajectoryEvaluator().evaluate_batch(bands["needs_judge"])   # only these
+```
+
 Needs `pip install "agentsynth-ai[learned]"` (scikit-learn). See
 [`examples/learned_verifier.py`](examples/learned_verifier.py).
 
