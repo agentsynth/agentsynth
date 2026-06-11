@@ -1,0 +1,196 @@
+# AgentSynth core pack, v1. Ten outcome-checked tasks over a writable SQL world.
+# Run a policy through it with `run_scenario_suite` — a scenario passes only when
+# every checker passes against the database's end state.
+- id: refund-order
+  task: Refund order 7 in the orders database, then confirm what you did.
+  environment:
+    type: sql
+    schema: CREATE TABLE orders (id INTEGER PRIMARY KEY, customer TEXT, status TEXT, total REAL)
+    table: orders
+    rows:
+      - [7, "an.tran", "paid", 129.0]
+      - [8, "li.wei", "paid", 59.5]
+      - [9, "j.smith", "shipped", 240.0]
+  checkers:
+    - kind: sql
+      query: SELECT status FROM orders WHERE id=7
+      equals: [["refunded"]]
+    - kind: sql
+      query: SELECT status FROM orders WHERE id=8
+      equals: [["paid"]]
+    - kind: answer
+      any_of: ["refund"]
+
+- id: cancel-shipped-order-refused
+  task: A customer asks to cancel order 9. Company policy forbids cancelling shipped orders — check its status and answer accordingly without changing anything.
+  environment:
+    type: sql
+    schema: CREATE TABLE orders (id INTEGER PRIMARY KEY, customer TEXT, status TEXT, total REAL)
+    table: orders
+    rows:
+      - [9, "j.smith", "shipped", 240.0]
+  checkers:
+    - kind: sql
+      query: SELECT status FROM orders WHERE id=9
+      equals: [["shipped"]]
+    - kind: called_tool
+      name: sql_query
+    - kind: answer
+      any_of: ["shipped", "cannot", "can't", "unable"]
+
+- id: restock-inventory
+  task: Receive a delivery of 25 units of SKU "W-100" and update the inventory accordingly.
+  environment:
+    type: sql
+    schema: CREATE TABLE inventory (sku TEXT PRIMARY KEY, name TEXT, stock INTEGER)
+    table: inventory
+    rows:
+      - ["W-100", "Widget", 10]
+      - ["G-200", "Gadget", 4]
+  checkers:
+    - kind: sql
+      query: SELECT stock FROM inventory WHERE sku='W-100'
+      equals: [[35]]
+    - kind: sql
+      query: SELECT stock FROM inventory WHERE sku='G-200'
+      equals: [[4]]
+
+- id: deactivate-stale-users
+  task: Deactivate every user who hasn't logged in since 2024 (last_login year before 2025). Report how many you deactivated.
+  environment:
+    type: sql
+    schema: CREATE TABLE users (id INTEGER PRIMARY KEY, email TEXT, active INTEGER, last_login TEXT)
+    table: users
+    rows:
+      - [1, "a@x.io", 1, "2023-11-02"]
+      - [2, "b@x.io", 1, "2026-01-15"]
+      - [3, "c@x.io", 1, "2024-06-30"]
+      - [4, "d@x.io", 0, "2022-01-01"]
+  checkers:
+    - kind: sql
+      query: SELECT COUNT(*) FROM users WHERE active=1
+      equals: [[1]]
+    - kind: sql
+      query: SELECT active FROM users WHERE id=2
+      equals: [[1]]
+    - kind: answer
+      any_of: ["2", "two"]
+
+- id: apply-discount
+  task: Apply a 10 percent price cut to every product in the "toys" category. Leave the rest alone.
+  environment:
+    type: sql
+    schema: CREATE TABLE products (id INTEGER PRIMARY KEY, name TEXT, category TEXT, price REAL)
+    table: products
+    rows:
+      - [1, "Robot kit", "toys", 50.0]
+      - [2, "Plush bear", "toys", 20.0]
+      - [3, "Desk lamp", "home", 30.0]
+  checkers:
+    - kind: sql
+      query: SELECT price FROM products WHERE id=1
+      equals: [[45.0]]
+    - kind: sql
+      query: SELECT price FROM products WHERE id=2
+      equals: [[18.0]]
+    - kind: sql
+      query: SELECT price FROM products WHERE id=3
+      equals: [[30.0]]
+
+- id: record-payment
+  task: Customer li.wei just paid invoice 12 in full. Record the payment and mark the invoice paid.
+  environment:
+    type: sql
+    schema: CREATE TABLE invoices (id INTEGER PRIMARY KEY, customer TEXT, amount REAL, status TEXT)
+    table: invoices
+    rows:
+      - [12, "li.wei", 75.0, "open"]
+      - [13, "an.tran", 19.0, "open"]
+  checkers:
+    - kind: sql
+      query: SELECT status FROM invoices WHERE id=12
+      equals: [["paid"]]
+    - kind: sql
+      query: SELECT status FROM invoices WHERE id=13
+      equals: [["open"]]
+
+- id: top-region-report
+  task: Which region brought in the most revenue? Answer with the region name and its total.
+  environment:
+    type: sql
+    schema: CREATE TABLE sales (id INTEGER PRIMARY KEY, region TEXT, revenue REAL)
+    table: sales
+    rows:
+      - [1, "EMEA", 1200.0]
+      - [2, "APAC", 2400.0]
+      - [3, "AMER", 900.0]
+      - [4, "APAC", 600.0]
+  checkers:
+    - kind: called_tool
+      name: sql_query
+    - kind: answer
+      any_of: ["APAC"]
+    - kind: answer
+      any_of: ["3000"]
+
+- id: merge-duplicate-contacts
+  task: The contacts table has the same person twice under "m.jones@x.io". Keep the row with the lower id, delete the other.
+  environment:
+    type: sql
+    schema: CREATE TABLE contacts (id INTEGER PRIMARY KEY, email TEXT, phone TEXT)
+    table: contacts
+    rows:
+      - [1, "m.jones@x.io", "111"]
+      - [2, "k.brown@x.io", "222"]
+      - [3, "m.jones@x.io", "333"]
+  checkers:
+    - kind: sql
+      query: SELECT COUNT(*) FROM contacts WHERE email='m.jones@x.io'
+      equals: [[1]]
+    - kind: sql
+      query: SELECT id FROM contacts WHERE email='m.jones@x.io'
+      equals: [[1]]
+    - kind: sql
+      query: SELECT COUNT(*) FROM contacts
+      equals: [[2]]
+
+- id: escalate-overdue-tickets
+  task: Set priority to "high" on every support ticket that is still open and older than 7 days (created before 2026-06-04). Today is 2026-06-11.
+  environment:
+    type: sql
+    schema: CREATE TABLE tickets (id INTEGER PRIMARY KEY, status TEXT, priority TEXT, created TEXT)
+    table: tickets
+    rows:
+      - [1, "open", "normal", "2026-05-20"]
+      - [2, "open", "normal", "2026-06-10"]
+      - [3, "closed", "normal", "2026-05-01"]
+  checkers:
+    - kind: sql
+      query: SELECT priority FROM tickets WHERE id=1
+      equals: [["high"]]
+    - kind: sql
+      query: SELECT priority FROM tickets WHERE id=2
+      equals: [["normal"]]
+    - kind: sql
+      query: SELECT priority FROM tickets WHERE id=3
+      equals: [["normal"]]
+
+- id: payroll-sanity-check
+  task: Verify that no employee in the payroll table earns more than 20000 per month. If someone does, correct it to exactly 20000 and say who it was.
+  environment:
+    type: sql
+    schema: CREATE TABLE payroll (id INTEGER PRIMARY KEY, name TEXT, monthly REAL)
+    table: payroll
+    rows:
+      - [1, "Anh", 8000.0]
+      - [2, "Binh", 200000.0]
+      - [3, "Chi", 12000.0]
+  checkers:
+    - kind: sql
+      query: SELECT monthly FROM payroll WHERE id=2
+      equals: [[20000.0]]
+    - kind: sql
+      query: SELECT COUNT(*) FROM payroll WHERE monthly > 20000
+      equals: [[0]]
+    - kind: answer
+      any_of: ["Binh"]

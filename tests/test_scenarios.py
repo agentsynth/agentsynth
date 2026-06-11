@@ -244,3 +244,39 @@ def test_run_scenario_suite_reports_pass_rate():
     assert report.passed == 0  # lazy talk passes neither world-state nor zzz check
     assert report.pass_rate == 0.0
     assert {r["id"] for r in report.results} == {"refund-7", "impossible"}
+
+
+def test_core_pack_loads_and_runs():
+    pytest.importorskip("yaml")
+    pack = load_scenarios("packs/core_v1.yaml")
+    assert len(pack) == 10
+    assert len({s.id for s in pack}) == 10
+    for scenario in pack:
+        env = scenario.build_environment()
+        assert env.tool_names()
+        env.close()
+
+    def lazy(obs, gym):
+        return {"answer": "done, all handled"}
+
+    report = run_scenario_suite(lazy, pack, seed=3)
+    assert report.n == 10
+    assert report.pass_rate < 0.3  # talk alone doesn't clear outcome checks
+
+
+def test_core_pack_refund_is_solvable():
+    pytest.importorskip("yaml")
+    pack = {s.id: s for s in load_scenarios("packs/core_v1.yaml")}
+    gym = AgentGym.from_scenario(pack["refund-order"], seed=3)
+    script = iter(
+        [
+            {
+                "tool_name": "sql_query",
+                "arguments": {"query": "UPDATE orders SET status='refunded' WHERE id=7"},
+            },
+            {"answer": "Refunded order 7 for an.tran."},
+        ]
+    )
+    episode = gym.rollout(lambda obs, g: next(script))
+    assert episode.info["outcome"]["score"] == 1.0
+    gym.close()
