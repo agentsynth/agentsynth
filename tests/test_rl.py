@@ -306,6 +306,72 @@ def test_episodes_export_for_offline_rl(gym, tmp_path):
     assert row["reward"] == episode.total_reward
 
 
+def test_collect_episodes_parallel_unique_and_ordered():
+    from agentsynth.rl import collect_episodes
+
+    def factory():
+        return AgentGym(SQLEnvironment(), task="total revenue by region")
+
+    def policy(obs, gym):
+        if gym.step_count == 0:
+            return {"tool_name": "sql_query", "arguments": {"query": GOOD_SQL}}
+        return {"answer": "EMEA leads."}
+
+    episodes = collect_episodes(factory, policy, episodes=8, max_workers=3, seed=11)
+    assert len(episodes) == 8
+    assert len({e.trajectory.id for e in episodes}) == 8  # no id collisions
+    assert all(e.trajectory.final_answer for e in episodes)
+    assert collect_episodes(factory, policy, episodes=0) == []
+
+
+def test_rft_export_keeps_the_top_quantile(tmp_path):
+    from agentsynth.rl import collect_episodes, episodes_to_rft_jsonl
+
+    def factory():
+        return AgentGym(SQLEnvironment(), task="total revenue by region")
+
+    flip = iter(range(100))
+
+    def mixed_policy(obs, gym):
+        # alternate: grounded episodes (high reward) vs lazy talk (low reward)
+        if next(flip) % 2 == 0 and gym.step_count == 0:
+            return {"tool_name": "sql_query", "arguments": {"query": GOOD_SQL}}
+        return {"answer": "EMEA leads on revenue."}
+
+    episodes = collect_episodes(factory, mixed_policy, episodes=6, max_workers=1, seed=3)
+    path = str(tmp_path / "rft.jsonl")
+    episodes_to_rft_jsonl(episodes, path, top_quantile=0.5)
+    rows = [json.loads(line) for line in open(path, encoding="utf-8")]
+    assert 0 < len(rows) < 6  # the lazy half got rejected
+    min_kept = min(r["reward"] for r in rows)
+    dropped = [e.total_reward for e in episodes if e.total_reward < min_kept]
+    assert all(d < min_kept for d in dropped)
+    assert all(r["messages"][0]["role"] == "user" for r in rows)
+
+    with pytest.raises(ValueError):
+        episodes_to_rft_jsonl([], path)
+    with pytest.raises(ValueError):
+        episodes_to_rft_jsonl(episodes, path, top_quantile=0.0)
+
+
+def test_grpo_script_dry_run():
+    import os
+    import subprocess
+    import sys
+
+    env = dict(os.environ, AGENTSYNTH_FORCE_MOCK="1", PYTHONPATH=".")
+    proc = subprocess.run(
+        [sys.executable, "scripts/train_grpo.py", "--dry-run"],
+        capture_output=True,
+        text=True,
+        env=env,
+        timeout=120,
+    )
+    assert proc.returncode == 0, proc.stderr
+    assert "dry-run OK" in proc.stdout
+    assert "[1.0, 0.0]" in proc.stdout  # good completion 1.0, garbage 0.0
+
+
 # --- OpenEnv bridge (skipped without openenv-core) -----------------------------
 
 
