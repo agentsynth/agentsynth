@@ -16,16 +16,14 @@ _SQL = {
     "apply-discount": "UPDATE products SET price = ROUND(price * 0.9, 2) WHERE category='toys'",
     "record-payment": "UPDATE invoices SET status='paid' WHERE id=12",
     "top-region-report": (
-        "SELECT region, SUM(revenue) AS total FROM sales "
-        "GROUP BY region ORDER BY total DESC"
+        "SELECT region, SUM(revenue) AS total FROM sales GROUP BY region ORDER BY total DESC"
     ),
     "merge-duplicate-contacts": (
         "DELETE FROM contacts WHERE email='m.jones@x.io' "
         "AND id NOT IN (SELECT MIN(id) FROM contacts WHERE email='m.jones@x.io')"
     ),
     "escalate-overdue-tickets": (
-        "UPDATE tickets SET priority='high' "
-        "WHERE status='open' AND created < '2026-06-04'"
+        "UPDATE tickets SET priority='high' WHERE status='open' AND created < '2026-06-04'"
     ),
     "payroll-sanity-check": "UPDATE payroll SET monthly=20000 WHERE monthly > 20000",
 }
