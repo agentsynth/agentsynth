@@ -145,9 +145,10 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     bench.add_argument(
         "--pack",
-        default="packs/core_v1.yaml",
-        metavar="PATH",
-        help="Scenario pack file (default: packs/core_v1.yaml).",
+        default="core_v1",
+        metavar="PACK",
+        help="Pack name, file, or URL. Names check packs/ locally, then the hub "
+        "(default: core_v1).",
     )
     bench.add_argument("--model", default=None, help="LiteLLM model id to drive the episodes.")
     bench.add_argument(
@@ -158,10 +159,18 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     bench.add_argument("--seed", type=int, default=7)
     bench.add_argument(
+        "--hub",
+        default="https://api.agentsynth.tech",
+        metavar="URL",
+        help="Hub used for by-name packs and bare --submit.",
+    )
+    bench.add_argument(
         "--submit",
+        nargs="?",
+        const="",
         default=None,
         metavar="URL",
-        help="Hub base URL to submit the result to (e.g. https://api.agentsynth.tech).",
+        help="Submit the result: to URL, or to the --hub when given without a value.",
     )
     bench.add_argument(
         "--name", default=None, help="Label for the submission (defaults to --model)."
@@ -332,12 +341,34 @@ def _resolve_policy(args: argparse.Namespace):
     raise SystemExit("error: pass --model <litellm id> or --policy module:function")
 
 
-def _cmd_bench(args: argparse.Namespace) -> int:
-    from .scenarios import load_scenarios, run_scenario_suite
+def _load_pack(pack: str, hub: str):
+    """Resolve --pack: a local file, a name under packs/, a hub pack, or a URL."""
+    import re
 
-    if not os.path.exists(args.pack):
-        raise SystemExit(f"error: pack not found: '{args.pack}'")
-    scenarios = load_scenarios(args.pack)
+    from .scenarios import Scenario, load_scenarios
+
+    if os.path.exists(pack):
+        return load_scenarios(pack), os.path.splitext(os.path.basename(pack))[0]
+    is_name = bool(re.fullmatch(r"[A-Za-z0-9_-]+", pack))
+    local = os.path.join("packs", f"{pack}.yaml")
+    if is_name and os.path.exists(local):
+        return load_scenarios(local), pack
+    if pack.startswith(("http://", "https://")):
+        url, pack_id = pack, pack.rstrip("/").rsplit("/", 1)[-1]
+    elif is_name:
+        url, pack_id = f"{hub.rstrip('/')}/v1/packs/{pack}", pack
+    else:
+        raise SystemExit(f"error: pack not found: '{pack}'")
+    payload = _get_json(url)
+    if not isinstance(payload, list):
+        raise SystemExit(f"error: {url} did not return a scenario pack")
+    return [Scenario(**item) for item in payload], pack_id
+
+
+def _cmd_bench(args: argparse.Namespace) -> int:
+    from .scenarios import run_scenario_suite
+
+    scenarios, pack_id = _load_pack(args.pack, args.hub)
     policy = _resolve_policy(args)
 
     report = run_scenario_suite(policy, scenarios, seed=args.seed)
@@ -346,20 +377,36 @@ def _cmd_bench(args: argparse.Namespace) -> int:
         print(f"[{mark}] {row['id']}  outcome={row['outcome_score']:.2f}")
     print(f"\n{report.passed}/{report.n} scenarios passed (pass_rate={report.pass_rate})")
 
-    if args.submit:
+    if args.submit is not None:
         from . import __version__
 
         name = args.name or args.model or args.policy or "anonymous"
         payload = {
-            "pack_id": os.path.splitext(os.path.basename(args.pack))[0],
+            "pack_id": pack_id,
             "model": name,
             "report": report.model_dump(),
             "client_version": __version__,
         }
-        url = args.submit.rstrip("/") + "/v1/submissions"
+        url = (args.submit or args.hub).rstrip("/") + "/v1/submissions"
         print(f"submitting to {url} ...")
         print(_post_json(url, payload))
     return 0
+
+
+def _get_json(url: str):
+    import json
+    from urllib import error, request
+
+    from . import __version__
+
+    req = request.Request(url, headers={"User-Agent": f"agentsynth/{__version__}"})
+    try:
+        with request.urlopen(req, timeout=30) as resp:
+            return json.loads(resp.read().decode("utf-8", "replace"))
+    except error.HTTPError as exc:
+        raise SystemExit(f"error: GET {url} -> HTTP {exc.code}")
+    except Exception as exc:
+        raise SystemExit(f"error: GET {url} failed: {exc}")
 
 
 def _post_json(url: str, payload: Dict) -> str:

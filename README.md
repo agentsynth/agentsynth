@@ -488,6 +488,22 @@ Scenarios serialize to YAML/JSON (`save_scenarios` / `load_scenarios`), so packs
 shareable, and `run_scenario_suite(policy, scenarios)` turns a pack into a benchmark
 with an outcome pass-rate. See [`examples/scenario_outcome.py`](examples/scenario_outcome.py).
 
+### Bench a model, get on the leaderboard
+
+`core_v1` is ten outcome-checked business tasks over a writable SQL world, with a
+live leaderboard at [api.agentsynth.tech/leaderboard](https://api.agentsynth.tech/leaderboard).
+Pack names resolve against `packs/` locally and fall back to the hub, so a bare
+`pip install agentsynth-ai` is enough:
+
+```bash
+agentsynth bench --pack core_v1 --model claude-haiku-4-5-20251001 --submit
+```
+
+`--policy mypkg.module:fn` benches your own agent loop instead of a LiteLLM model;
+`--submit` without a value posts to the default hub (override with `--hub`).
+[`examples/core_v1_oracle.py`](examples/core_v1_oracle.py) is the reference
+solution — the ceiling every entry chases.
+
 ### Import your production traces
 
 OpenAI-style `tool_calls` logs, Anthropic `tool_use` blocks, and OpenTelemetry

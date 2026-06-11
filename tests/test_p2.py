@@ -160,3 +160,77 @@ def test_cli_bench_with_custom_policy(capsys):
 def test_cli_bench_requires_model_or_policy():
     with pytest.raises(SystemExit):
         cli_main(["bench", "--pack", "packs/core_v1.yaml"])
+
+
+def test_pack_resolution_prefers_local_then_hub(monkeypatch):
+    from agentsynth import cli as climod
+
+    # a bare name finds packs/<name>.yaml without touching the network
+    scenarios, pack_id = climod._load_pack("core_v1", hub="https://unused.invalid")
+    assert pack_id == "core_v1" and len(scenarios) == 10
+
+    # an unknown name goes to the hub
+    seen = {}
+
+    def fake_get(url):
+        seen["url"] = url
+        return [s.model_dump() for s in scenarios[:2]]
+
+    monkeypatch.setattr(climod, "_get_json", fake_get)
+    fetched, pack_id = climod._load_pack("other_pack", hub="https://hub.example/")
+    assert seen["url"] == "https://hub.example/v1/packs/other_pack"
+    assert pack_id == "other_pack" and len(fetched) == 2
+
+    # a URL is fetched as-is, pack id from the tail
+    fetched, pack_id = climod._load_pack(
+        "https://hub.example/v1/packs/core_v1", hub="https://unused.invalid"
+    )
+    assert pack_id == "core_v1" and len(fetched) == 2
+
+    # garbage that is neither file, name, nor URL fails cleanly
+    with pytest.raises(SystemExit):
+        climod._load_pack("no/such/pack.yaml", hub="https://unused.invalid")
+
+
+def test_cli_bench_accepts_a_json_pack(tmp_path, capsys):
+    from agentsynth.scenarios import load_scenarios, save_scenarios
+
+    pack = tmp_path / "mini.json"
+    save_scenarios(load_scenarios("packs/core_v1.yaml")[:2], str(pack))
+    code = cli_main(["bench", "--pack", str(pack), "--policy", "tests.bench_policy:lazy"])
+    assert code == 0
+    assert "0/2 scenarios passed" in capsys.readouterr().out
+
+
+def test_cli_bench_bare_submit_posts_to_the_hub(monkeypatch, capsys):
+    from agentsynth import cli as climod
+
+    posted = {}
+
+    def fake_post(url, payload):
+        posted["url"] = url
+        posted["pack_id"] = payload["pack_id"]
+        posted["model"] = payload["model"]
+        return '{"id": 1}'
+
+    monkeypatch.setattr(climod, "_post_json", fake_post)
+    code = cli_main(
+        [
+            "bench",
+            "--pack",
+            "packs/core_v1.yaml",
+            "--policy",
+            "tests.bench_policy:lazy",
+            "--submit",
+            "--hub",
+            "https://hub.example",
+            "--name",
+            "smoke",
+        ]
+    )
+    assert code == 0
+    assert posted == {
+        "url": "https://hub.example/v1/submissions",
+        "pack_id": "core_v1",
+        "model": "smoke",
+    }
