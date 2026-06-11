@@ -206,7 +206,10 @@ def leaderboard_page(pack: str = "core_v1") -> str:
         )
         or '<tr><td colspan="4">No submissions yet — be the first.</td></tr>'
     )
-    cmd = f"agentsynth bench --pack packs/{pack}.yaml --model &lt;model&gt; --submit https://api.agentsynth.tech"
+    cmd = (
+        "pip install agentsynth-ai && agentsynth bench "
+        f"--pack {pack} --model &lt;model&gt; --submit https://api.agentsynth.tech"
+    )
     return f"""<!doctype html><html><head><meta charset="utf-8">
 <title>AgentSynth — {pack} leaderboard</title>
 <style>body{{font:16px/1.5 system-ui;max-width:720px;margin:3rem auto;padding:0 1rem;color:#1a1a1a}}
