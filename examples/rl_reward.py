@@ -1,11 +1,10 @@
-"""RL episodes and verified rewards, end to end and fully offline.
+"""RL episodes and verified rewards, end to end, fully offline.
 
     python examples/rl_reward.py
 
-Three things in one file: an AgentGym episode where every tool call runs against a
-real SQLite database and the terminal reward comes from verification + the judge; a
-TRL-style reward function scoring model completions by parse/tool/args/execution; and
-the episode export for offline RL. Plug the reward function straight into TRL:
+An AgentGym episode against a real SQLite database, a TRL-style reward function
+scoring completions on parse/tool/args/execution, and the episode export for
+offline RL. The reward function plugs straight into TRL:
 
     GRPOTrainer(model, reward_funcs=make_reward_fn(environment=env), ...)
 """

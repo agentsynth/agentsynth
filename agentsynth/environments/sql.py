@@ -87,8 +87,8 @@ class SQLEnvironment(Environment):
         self._schema = schema
         self._rows = list(_ROWS if rows is None else rows)
         self._table = table
-        # Scenarios flip this off: the database is in-memory and re-seeded on reset,
-        # so letting the agent mutate it is the point — the end state gets checked.
+        # Scenarios set read_only=False: the DB is in-memory and re-seeded on
+        # reset(), and their checkers assert on the end state.
         self.read_only = read_only
         # check_same_thread=False + a lock so the concurrent runner can share one env.
         self._lock = threading.Lock()

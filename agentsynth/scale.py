@@ -1,23 +1,16 @@
-"""Industrial-scale generation: caching, retries, budgets, and resumable runs.
+"""Caching, retries, budgets, and resumable runs for real-LLM generation.
 
-The mock engine proves the pipeline; this module is what makes real-LLM runs a tool
-you can leave running at work. `CachingLLMClient` wraps the provider with a disk
-cache (identical prompts are free on re-runs), exponential-backoff retries, a token/
-cost meter, a hard budget cap, and a simple rate limiter — and drops into the
-generator through its `llm_client=` parameter:
+`CachingLLMClient` is a drop-in `LLMClient` (the generator's `llm_client=`) with a
+disk cache keyed on the full request, exponential-backoff retries, a token/cost
+meter, a hard budget cap, and an optional rate limit. `run_resumable` writes
+trajectories incrementally with a state file, so an interrupted run continues
+where it stopped. Local backends work through LiteLLM model strings
+("ollama/llama3.1", "hosted_vllm/<model>").
 
     meter = CostMeter()
     client = CachingLLMClient("claude-haiku-...", cache_dir=".agentsynth_cache",
                               budget_usd=25.0, meter=meter)
     gen = AgentTrajectoryGenerator(llm_client=client)
-    ...
-    print(meter.report())
-
-`run_resumable` writes trajectories incrementally and keeps a state file, so a
-10k-trajectory run survives crashes, Ctrl-C, and spot instances: re-invoke with the
-same `out_dir` and it continues where it stopped. Local backends work through
-LiteLLM's routing — pass model ids like `"ollama/llama3.1"` or
-`"hosted_vllm/<model>"` and point the relevant env var at your server.
 """
 
 from __future__ import annotations
@@ -71,11 +64,10 @@ class CostMeter:
 class CachingLLMClient(LLMClient):
     """An LLMClient with a disk cache, retries, a cost meter, and a budget cap.
 
-    The cache key is the full request (model, messages, sampling params), so
-    re-running a recipe replays for free and changing anything misses cleanly.
-    Costs come from LiteLLM's pricing table when it knows the model; otherwise
-    `price_per_1k_tokens` provides the estimate (and without either, spend tracks
-    tokens but `usd` stays 0 — set a price before trusting `budget_usd`).
+    The cache key is the full request (model, messages, sampling params). Costs
+    come from LiteLLM's pricing table when it knows the model, otherwise from
+    `price_per_1k_tokens`; without either, `usd` stays 0, so set a price before
+    relying on `budget_usd`.
     """
 
     def __init__(
@@ -209,16 +201,14 @@ def run_resumable(
     max_items: Optional[int] = None,
     progress: Optional[Any] = None,
 ) -> Dict[str, Any]:
-    """Generate a recipe with crash-safe, incremental output.
+    """Generate a recipe with incremental output and a resume file.
 
-    Trajectories append to `<out_dir>/trajectories.jsonl` one line at a time, and
-    `<out_dir>/state.json` records how far the plan got — re-invoking with the same
-    `out_dir` continues from there (the recipe must be the same one). `max_items`
-    caps how many trajectories this invocation adds, which also makes chunked /
-    cron-driven runs trivial. Returns `{total, done, added, path}`.
-
-    Evaluation, verification, and dedup are post-passes: `load_jsonl` the output
-    when `done == total` and run them over the full set.
+    Trajectories append to `<out_dir>/trajectories.jsonl` one line at a time;
+    `<out_dir>/state.json` records progress, and re-invoking with the same
+    `out_dir` (and the same recipe) continues from there. `max_items` caps how
+    many this invocation adds, for chunked or cron-driven runs. Returns
+    `{total, done, added, path}`. Run evaluation/verification/dedup as a
+    post-pass over `load_jsonl(path)` once `done == total`.
     """
     from .exporters import _traj_to_record
     from .generator import AgentTrajectoryGenerator

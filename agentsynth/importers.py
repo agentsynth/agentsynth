@@ -1,24 +1,17 @@
-"""Bring real agent traces into the engine: import, then verify, judge, export.
+"""Import agent traces (OpenAI- and Anthropic-format logs) as Trajectories.
 
-Production agent logs are already a dataset — they're just not trainable yet. These
-importers convert the two formats almost every stack emits into `Trajectory`
-objects, so the whole pipeline applies to *real* traffic: judge it, verify it,
-dedup it, mine its failures, export SFT/DPO.
+Once imported, the rest of the pipeline applies: judging, verification, dedup,
+failure mining, SFT/DPO export.
 
-    trajectories = load_traces_jsonl("prod_logs.jsonl")        # auto-detects format
+    trajectories = load_traces_jsonl("prod_logs.jsonl")   # format auto-detected
     results = TrajectoryEvaluator().evaluate_batch(trajectories)
-    keep = [t for t, r in zip(trajectories, results) if r.passed]
 
-Supported shapes:
-- **OpenAI-style chat messages** — `role` user/assistant/tool, assistant
-  `tool_calls` with JSON-string arguments. What the OpenAI SDK and most proxies
-  (LiteLLM, OpenRouter, vLLM) log.
-- **Anthropic Messages content blocks** — `tool_use` / `tool_result` / `text`.
-- Anything close to `[{"role", "content"}, ...]` falls back to the OpenAI path.
-
-Tool schemas usually aren't in the logs; pass `tools=` when you have them so
-verification can check required arguments — otherwise minimal specs are inferred
-from the calls themselves.
+Two shapes are recognized: OpenAI-style chat messages (assistant `tool_calls`
+with JSON-string arguments — also what LiteLLM/OpenRouter/vLLM log) and
+Anthropic content blocks (`tool_use` / `tool_result`). Anything close to
+`[{"role", "content"}, ...]` goes down the OpenAI path. Tool schemas usually
+aren't in the logs; pass `tools=` when you have them, otherwise minimal specs
+are inferred from the calls.
 """
 
 from __future__ import annotations
@@ -92,12 +85,11 @@ def trajectory_from_messages(
     domain: Optional[str] = None,
     source: str = "openai",
 ) -> Trajectory:
-    """OpenAI-style chat messages → a Trajectory (roughly `to_messages` inverted).
+    """OpenAI-style chat messages to a Trajectory (roughly `to_messages` inverted).
 
-    The first user message becomes the query; assistant text becomes thoughts —
-    except the last one, which becomes the final answer; `tool_calls` become
-    tool_call steps (JSON-string arguments are parsed); tool/function-role
-    messages become observations.
+    First user message becomes the query. Assistant text becomes thoughts, except
+    the last one, which becomes the final answer. `tool_calls` become tool_call
+    steps and tool/function-role messages become observations.
     """
     steps: List[TrajectoryStep] = []
     resolved_query = query or ""

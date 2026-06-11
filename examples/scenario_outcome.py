@@ -1,10 +1,9 @@
-"""Outcome-checked scenarios: the reward asserts on how the world ends up.
+"""Outcome-checked scenarios: the reward comes from the world's end state.
 
     python examples/scenario_outcome.py
 
-Two policies attempt "refund order 7". One actually updates the database; one just
-*says* it did. Process checks can't tell them apart — the scenario's state checkers
-can, and the reward follows the world, not the words. Fully offline.
+Two policies attempt "refund order 7". One updates the database; one only says it
+did. The scenario's state checkers tell them apart. Fully offline.
 """
 
 import os

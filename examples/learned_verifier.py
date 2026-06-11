@@ -1,12 +1,11 @@
-"""Distill the LLM judge into a cheap classifier and report the agreement.
+"""Distill the LLM judge into a small classifier and report the agreement.
 
     pip install "agentsynth-ai[learned]"
     python examples/learned_verifier.py
 
 Generates a batch, judges it, trains a LearnedVerifier on the judge's labels, and
-prints how often the classifier agrees with the judge on held-out trajectories —
-the point being that a screening pass costs microseconds instead of an LLM call.
-Runs offline; with real judge labels (provider key set) the same code applies.
+prints the held-out agreement. Runs offline; the same code applies with real
+judge labels (provider key set).
 """
 
 import os

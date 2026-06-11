@@ -1,10 +1,9 @@
-"""One full turn of the flywheel: benchmark -> mine failures -> regenerate.
+"""One turn of the flywheel: benchmark -> mine failures -> regenerate.
 
     python examples/flywheel.py
 
-Benchmarks a (deliberately weak) model, mines what it got wrong, and turns the
-failure report into a verified generation run aimed at exactly those gaps — the
-data you'd fine-tune on next. Fully offline.
+Benchmarks a weak model, mines what it got wrong, and turns the failure report
+into a verified generation run over those gaps. Fully offline.
 """
 
 import os

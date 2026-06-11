@@ -1,16 +1,12 @@
-"""Collect episodes in parallel and turn the good ones into training data.
+"""Parallel episode collection and exports for offline training.
 
-A gym holds one live episode, so parallel collection means one gym per worker —
-`collect_episodes` takes a factory, fans rollouts across a thread pool, and seeds
-each episode differently so trajectory ids never collide:
+A gym holds one live episode, so collection runs one gym per worker via a
+factory. `episodes_to_rft_jsonl` keeps the top reward quantile and writes
+SFT-ready `messages` records (rejection sampling).
 
     episodes = collect_episodes(lambda: AgentGym.from_scenario(scenario),
                                 policy, episodes=64, max_workers=8)
     episodes_to_rft_jsonl(episodes, "rft.jsonl", top_quantile=0.25)
-
-The RFT export is rejection sampling made concrete: keep the top reward quantile,
-write their conversations as SFT-ready `messages` records (with the reward kept on
-the row), fine-tune on what actually worked.
 """
 
 from __future__ import annotations
@@ -31,11 +27,10 @@ def collect_episodes(
     max_workers: int = 4,
     seed: int = 7,
 ) -> List[EpisodeResult]:
-    """Run `episodes` rollouts across a pool of independently-built gyms.
+    """Run `episodes` rollouts across a pool of gyms built from `gym_factory`.
 
-    Episode `i` runs with seed `seed + i`, so ids stay unique and a re-run with the
-    same arguments reproduces the same episodes (mock mode). Results come back in
-    episode order regardless of which worker ran them.
+    Episode i uses seed + i, so ids stay unique and a re-run reproduces the same
+    episodes in mock mode. Results come back in episode order.
     """
     if episodes <= 0:
         return []
@@ -61,8 +56,8 @@ def episodes_to_rft_jsonl(
 ) -> str:
     """Keep the top reward quantile and write SFT-ready `messages` records.
 
-    `top_quantile=0.25` keeps the best quarter. Ties at the cutoff are kept, so a
-    batch where every episode scored the same exports whole."""
+    Ties at the cutoff are kept, so a batch where every episode scored the same
+    exports whole."""
     if not episodes:
         raise ValueError("no episodes to export")
     if not 0.0 < top_quantile <= 1.0:

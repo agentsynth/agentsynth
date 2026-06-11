@@ -1,10 +1,8 @@
-"""Scenarios: a task, a world to do it in, and checks on how the world ends up.
+"""Scenarios: an environment with seed state, a task, and end-state checks.
 
-Process checks (valid args, code that re-runs) tell you a trajectory *looks* right.
-A scenario asserts the thing that actually matters: after the episode, is the world
-in the goal state? Each scenario bundles an environment config (with its own seed
-state, rebuilt per episode), the task, and outcome checkers that run against the
-final environment + trajectory:
+Checkers run after the episode, against the final environment and the trajectory,
+so the score reflects whether the goal state was reached rather than how the
+transcript reads:
 
     scenario = Scenario(
         id="refund-7",
@@ -15,10 +13,10 @@ final environment + trajectory:
             CalledTool(name="sql_query"),
         ],
     )
-    gym = AgentGym.from_scenario(scenario)     # outcome becomes the dominant reward
+    gym = AgentGym.from_scenario(scenario)   # outcome becomes the dominant reward
 
-Scenarios serialize to YAML/JSON, so packs are shareable and community-buildable;
-`run_scenario_suite` turns a pack into a benchmark with an outcome pass-rate.
+Scenarios serialize to YAML/JSON (`save_scenarios` / `load_scenarios`), and
+`run_scenario_suite` scores a policy over a pack.
 """
 
 from __future__ import annotations
@@ -142,7 +140,7 @@ Checker = Annotated[
 
 
 class Scenario(BaseModel):
-    """A self-contained, serializable task-with-a-world-and-a-goal."""
+    """A serializable bundle: environment config, task, and outcome checkers."""
 
     id: str
     task: str
@@ -158,7 +156,7 @@ class Scenario(BaseModel):
         if env_type == "sql":
             if "rows" in config:
                 config["rows"] = [tuple(r) for r in config["rows"]]
-            config.setdefault("read_only", False)  # scenarios own their world
+            config.setdefault("read_only", False)  # scenario databases are meant to be written
             return SQLEnvironment(**config)
         if env_type == "rest":
             return RestEnvironment(**config)
@@ -190,9 +188,9 @@ def run_scenario_suite(
     seed: int = 7,
     **gym_kwargs: Any,
 ) -> ScenarioReport:
-    """Run a policy through every scenario; a scenario passes when every checker does.
+    """Run a policy through every scenario. A scenario passes when every checker does.
 
-    `policy(observation, gym) -> action`, same shape `AgentGym.rollout` takes.
+    `policy(observation, gym) -> action`, the same shape `AgentGym.rollout` takes.
     """
     from .rl import AgentGym
 

@@ -111,7 +111,7 @@ def test_route_by_confidence_partitions_the_batch(judged_batch):
     for traj in bands["auto_fail"]:
         assert verifier.predict_proba(traj) < 0.3
 
-    # the whole point: a wider band sends more to the judge, never fewer
+    # a wider band sends more to the judge, never fewer
     wider = route_by_confidence(verifier, trajs, low=0.1, high=0.9)
     assert len(wider["needs_judge"]) >= len(bands["needs_judge"])
 

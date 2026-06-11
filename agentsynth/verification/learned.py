@@ -1,10 +1,8 @@
-"""Distill the LLM judge into a small, cheap classifier.
+"""Distill the LLM judge into a small classifier.
 
-The LLM-as-judge is the quality signal, but calling it on every trajectory is what
-makes generation expensive at scale. A LearnedVerifier trains on judge labels and
-predicts pass/fail from cheap, deterministic trajectory features — microseconds per
-trajectory instead of an LLM call. Distill once, screen cheaply, and reserve the
-real judge for the borderline band.
+A LearnedVerifier trains on judge labels and predicts pass/fail from cheap,
+deterministic trajectory features, so large batches can be screened without an
+LLM call per trajectory.
 
     result = run_recipe(Recipe(num_trajectories=500, verify=True))
     judged = TrajectoryEvaluator().evaluate_batch(result.trajectories)
@@ -12,9 +10,8 @@ real judge for the borderline band.
     print(report["agreement"])          # held-out agreement with the LLM judge
     verify_trajectory(traj, verifiers=[verifier])
 
-scikit-learn does the fitting: `pip install "agentsynth-ai[learned]"`. The fitted
-verifier is a plain picklable object and plugs into the same `Verifier` interface
-as everything else.
+scikit-learn does the fitting (`pip install "agentsynth-ai[learned]"`). The
+fitted verifier is picklable and implements the standard `Verifier` interface.
 """
 
 from __future__ import annotations
@@ -115,7 +112,7 @@ class LearnedVerifier(Verifier):
     """A judge-distilled classifier behind the standard Verifier interface.
 
     Advisory by default (`required=False`): it contributes to the verification
-    score without hard-failing a trajectory, since it's a screen, not a proof.
+    score without hard-failing a trajectory.
     """
 
     name = "learned_judge"
@@ -225,12 +222,11 @@ def route_by_confidence(
     low: float = 0.3,
     high: float = 0.7,
 ) -> Dict[str, List[Trajectory]]:
-    """Spend the judge only where the cheap screen is unsure.
+    """Split a batch by predicted pass probability.
 
-    Splits a batch into `auto_fail` (p(pass) < low), `needs_judge` (the borderline
-    band), and `auto_pass` (p(pass) >= high). With a calibrated verifier the band
-    edges mean what they say — run the real LLM judge over `needs_judge` only and
-    you keep most of its signal for a fraction of the cost.
+    Below `low` goes to `auto_fail`, at or above `high` goes to `auto_pass`, and
+    the band in between is `needs_judge` — the only part worth an LLM judge call.
+    Calibrate the verifier first if you want the band edges to be meaningful.
     """
     if not 0.0 <= low <= high <= 1.0:
         raise ValueError("thresholds must satisfy 0 <= low <= high <= 1")

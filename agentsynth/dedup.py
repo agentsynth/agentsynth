@@ -82,10 +82,10 @@ def dedup_trajectories(
     prompt-level dedup instead.
 
     `method="pairwise"` (default) compares against everything kept — exact but
-    O(n²), fine into the low thousands. `method="minhash"` buckets by MinHash/LSH
-    bands first and only Jaccard-verifies bucket collisions, which scales to the
-    100k range; near-duplicates below the band sensitivity can slip through, so
-    keep `threshold` high (≥0.8) with the defaults.
+    O(n²). `method="minhash"` buckets by MinHash/LSH bands and only
+    Jaccard-verifies collisions, which stays linear at the 100k scale; pairs
+    below the band sensitivity can slip through, so keep `threshold` >= 0.8 with
+    the default bands.
     """
     key = key or _content
     result = DedupResult()

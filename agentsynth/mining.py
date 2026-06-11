@@ -1,17 +1,14 @@
-"""Close the flywheel: mine failures, then aim the next generation run at them.
+"""Mine failures from a benchmark or judge run and target the next batch at them.
+
+`mine_failures` categorizes benchmark misses (no call, wrong tool, bad arguments),
+`mine_judge_failures` flags rubric dimensions under a threshold, and
+`recipe_from_failures` turns either report into a Recipe whose queries are
+variations of the failed tasks:
 
     generate -> verify -> train -> evaluate -> mine failures -> generate ...
 
-A benchmark run tells you *that* a model fails; this module turns it into *what to
-generate next*. `mine_failures` categorizes every miss (didn't emit a call, picked
-the wrong tool, fumbled the arguments), `mine_judge_failures` does the same for
-judge scores below a threshold, and `recipe_from_failures` converts the report into
-a ready-to-run Recipe whose queries are variations of exactly the tasks the model
-got wrong.
-
-The variations are deterministic templates — deliberately mock-first, like the rest
-of the engine. Swap in an LLM paraphraser when you want richer expansions; the loop
-structure stays the same.
+The variations are deterministic templates; swap in an LLM paraphraser for richer
+ones, the loop stays the same.
 """
 
 from __future__ import annotations
@@ -136,10 +133,10 @@ def _count_kinds(failures: Sequence[Failure]) -> Dict[str, int]:
 
 
 def targeted_queries(report: FailureReport, k: int = 20, seed: int = 7) -> List[str]:
-    """`k` query variations aimed at the failed tasks, deterministic for a seed.
+    """`k` query variations over the failed tasks, deterministic for a seed.
 
-    Failures are visited round-robin so every weak spot gets coverage before any
-    gets a second variant."""
+    Failures are visited round-robin, so each one gets a variant before any gets
+    a second."""
     sources = [f for f in report.failures if f.query]
     queries: List[str] = []
     seen = set()
@@ -164,10 +161,10 @@ def targeted_queries(report: FailureReport, k: int = 20, seed: int = 7) -> List[
 def recipe_from_failures(
     report: FailureReport, k: int = 20, seed: int = 7, **recipe_kwargs
 ) -> Recipe:
-    """A ready-to-run Recipe whose queries chase the report's failures.
+    """A Recipe whose queries target the report's failures.
 
-    Defaults to `verify=True` (the whole point is trustworthy patches); any Recipe
-    field can be overridden through `recipe_kwargs`."""
+    Defaults to `verify=True`; any Recipe field can be overridden through
+    `recipe_kwargs`."""
     queries = targeted_queries(report, k=k, seed=seed)
     if not queries:
         raise ValueError("the failure report has no failures with queries to target")

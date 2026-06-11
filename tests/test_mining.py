@@ -87,7 +87,7 @@ def test_round_robin_covers_every_failure_first(weak_report):
 
 def test_recipe_from_failures_closes_the_loop(weak_report):
     recipe = recipe_from_failures(weak_report, k=6, evaluate=False)
-    assert recipe.verify is True  # trustworthy patches by default
+    assert recipe.verify is True  # on by default
     result = run_recipe(recipe)
     assert len(result.trajectories) == 6
     assert result.metrics.get("verified_rate") is not None

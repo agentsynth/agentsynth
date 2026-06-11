@@ -1,14 +1,10 @@
-"""Verified reward functions for RL trainers.
+"""Reward functions for RL trainers, scored by checks instead of a judge.
 
-`make_reward_fn` builds a TRL-compatible reward callable — `GRPOTrainer(model,
-reward_funcs=make_reward_fn(environment=env), ...)` — that scores a model's tool-call
-completion on four checks instead of vibes: does it parse, does it name a real tool,
-are the required arguments present, and does the call actually execute without an
-error. Deterministic, costs no LLM call, and the execution check runs against a real
-environment.
-
-The default weights split evenly across the active checks; pass `weights=` to reshape,
-and `execute=False` (or no environment) to score format/schema only.
+`make_reward_fn(environment=env)` returns a callable in the shape TRL's
+`reward_funcs` expects. Each completion is parsed as a tool call and scored on
+four checks: it parses, the tool exists, required args are present, and the call
+executes without an error. Weights renormalize over whichever checks are active;
+pass `execute=False` (or no environment) to score format/schema only.
 """
 
 from __future__ import annotations
@@ -110,12 +106,11 @@ def make_reward_fn(
 
 
 def episodes_to_grpo_jsonl(episodes: Sequence[EpisodeResult], path: str) -> str:
-    """One `{"prompt", "completion", "reward"}` row per episode, for offline methods
-    (rejection sampling, best-of-n filtering, reward-weighted SFT).
+    """One `{"prompt", "completion", "reward"}` row per episode.
 
-    The completion is the episode's *first* tool call (or the final answer when no
-    tool was called) — a deliberately single-turn view; use the trajectories on the
-    episodes themselves when you need the full multi-step data."""
+    The completion is the episode's first tool call (or the final answer when no
+    tool was called). For the full multi-step data, use the trajectories on the
+    episodes themselves."""
     if not episodes:
         raise ValueError("no episodes to export")
     with open(path, "w", encoding="utf-8") as fh:

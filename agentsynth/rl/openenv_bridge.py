@@ -1,10 +1,9 @@
-"""Bridge an AgentGym onto the OpenEnv standard.
+"""Bridge an AgentGym onto the OpenEnv standard (meta-pytorch).
 
-OpenEnv (meta-pytorch) standardizes how RL environments are published and consumed —
-Gym-style `reset()` / `step()` / `state` over a client/server protocol — but leaves
-reward definition to the libraries that specialize in it. That's exactly the piece
-AgentSynth brings: the bridged environment serves real tool execution per step and a
-verification + judge reward at the end of the episode.
+OpenEnv standardizes the environment interface — `reset()` / `step()` / `state`
+over a client/server protocol — and leaves rewards to the environment library.
+The bridged gym serves real tool execution per step and the verification + judge
+reward at the end of the episode.
 
     from agentsynth.rl import AgentGym, to_openenv
 
@@ -15,11 +14,10 @@ verification + judge reward at the end of the episode.
                                   arguments={"answer": "EMEA leads"}))
     print(obs.reward, obs.done)
 
-The agent ends an episode by calling the reserved `final_answer` tool; its `answer`
-argument is coerced to a string (pass text, not nested objects). Note `state` is a
-property here because the OpenEnv spec requires one, while AgentGym exposes `state()`
-as a method. Requires `pip install "agentsynth-ai[rl]"` (Python 3.10+); the core
-AgentGym works without it.
+The agent ends an episode by calling the reserved `final_answer` tool; its
+`answer` argument is coerced to a string. `state` is a property here because the
+OpenEnv spec requires one. Requires `pip install "agentsynth-ai[rl]"`
+(Python 3.10+); the core AgentGym works without it.
 """
 
 from __future__ import annotations
@@ -41,7 +39,7 @@ def to_openenv(gym: AgentGym) -> Any:
         ) from exc
 
     class AgentSynthOpenEnv(Environment):
-        """OpenEnv-standard wrapper: tool calls in, observations + verified reward out."""
+        """OpenEnv wrapper: CallToolAction in, CallToolObservation (+ reward) out."""
 
         def __init__(self, inner: AgentGym) -> None:
             self.gym = inner

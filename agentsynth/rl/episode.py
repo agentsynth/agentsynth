@@ -1,17 +1,15 @@
-"""Gym-style episodes over any AgentSynth environment, with verified rewards.
+"""Gym-style episodes over an Environment, scored by the verification stack.
 
-An agent (or a policy under RL training) interacts step by step: each action is a
-tool call that really executes, and when the episode ends the whole trajectory goes
-through the standard verification stack plus the judge — so the terminal reward is
-grounded in what actually happened, not in how plausible the text looks.
+Actions are tool calls that really execute. When the episode ends, the trajectory
+runs through `verify_trajectory` and the judge, and that becomes the terminal
+reward.
 
     gym = AgentGym(SQLEnvironment(), task="total revenue by region")
-    obs = gym.reset()
-    out = gym.step({"tool_name": "sql_query", "arguments": {"query": "SELECT ..."}})
-    out = gym.step({"answer": "EMEA leads with ..."})   # ends + scores the episode
+    gym.reset()
+    gym.step({"tool_name": "sql_query", "arguments": {"query": "SELECT ..."}})
+    gym.step({"answer": "EMEA leads."})   # ends the episode and scores it
 
-The same episodes export to JSONL for offline methods (rejection sampling, GRPO-style
-filtering), and `agentsynth.rl.to_openenv` bridges a gym onto the OpenEnv standard.
+`agentsynth.rl.to_openenv` serves a gym over the OpenEnv protocol.
 """
 
 from __future__ import annotations
@@ -76,21 +74,17 @@ def _coerce_action(action: ActionLike) -> ToolAction:
 
 
 class AgentGym:
-    """Step-by-step episodes whose terminal reward comes from verification + the judge.
+    """One live episode at a time; use one gym per worker.
 
-    Per-step shaping is deliberately small and transparent: an action that names no
-    real tool is penalized by `invalid_action_penalty`, an observation that comes back
-    as an error is penalized by `error_penalty` (both applied as negative rewards),
-    and everything else is 0 until the episode ends. The terminal reward is
-    `verify_weight * verification.score + judge_weight * judge_overall`, both in
-    [0, 1] — and with `require_grounding` (the default) the verification credit is
-    only paid when the trajectory actually executed something, so a policy can't farm
-    reward by skipping the tools and emitting a plausible answer.
+    Step rewards: -invalid_action_penalty for a tool that doesn't exist,
+    -error_penalty when the observation is an error, otherwise 0. Terminal
+    reward: verify_weight * verification.score + judge_weight * judge overall,
+    plus outcome_weight * scenario score when a scenario is attached. With
+    require_grounding (default), verification credit is only paid if the episode
+    executed at least one tool or code step.
 
-    An action carrying `answer` always ends the episode, even if it also names a tool.
-    `state()` is a method here; the OpenEnv bridge exposes it as a property, as that
-    spec requires. Not thread-shareable (one live episode at a time) — use one gym
-    per worker.
+    An action with `answer` set ends the episode even if it also names a tool.
+    `state()` is a method here; the OpenEnv bridge exposes it as a property.
     """
 
     def __init__(
@@ -132,9 +126,8 @@ class AgentGym:
 
     @classmethod
     def from_scenario(cls, scenario: Any, **kwargs: Any) -> "AgentGym":
-        """A gym whose episodes play out a Scenario: its environment (rebuilt with the
-        scenario's seed state), its task, and — dominant by default — its outcome
-        checks as the terminal reward (0.6 outcome / 0.2 verification / 0.2 judge)."""
+        """Build a gym from a Scenario; default weights become
+        0.6 outcome / 0.2 verification / 0.2 judge."""
         kwargs.setdefault("outcome_weight", 0.6)
         kwargs.setdefault("verify_weight", 0.2)
         kwargs.setdefault("judge_weight", 0.2)
@@ -231,8 +224,7 @@ class AgentGym:
         trajectory.verification = verification.model_dump()
         judged = self.judge.evaluate(trajectory)
 
-        # Verification credit must be earned: an episode that never executed anything
-        # has nothing verified, so it gets no credit for "passing" vacuously.
+        # no tool calls and no code -> nothing was verified, no credit for it
         grounded = bool(trajectory.tool_calls()) or any(
             s.step_type == "code_execution" for s in trajectory.steps
         )
@@ -247,8 +239,6 @@ class AgentGym:
             "trajectory": trajectory,
         }
         if self.scenario is not None:
-            # The scenario's checkers assert on how the world actually ended up —
-            # the outcome is the part of the reward a policy can't talk its way into.
             outcome_score, outcomes = self.scenario.run_checks(self.environment, trajectory)
             reward += self.outcome_weight * outcome_score
             info["outcome"] = {
@@ -266,8 +256,7 @@ class AgentGym:
         )
 
     def _build_trajectory(self, answer: str, truncated: bool) -> Trajectory:
-        # Unique per episode (the index) but reproducible for the same seed + task +
-        # rollout order, so repeated collection never silently collides ids.
+        # unique per rollout, reproducible for the same seed + task + order
         key = f"{self.task}#{self._episode_index}"
         traj_id = format(stable_seed(self.seed, key) & 0xFFFFFFFFFFFF, "012x")
         return Trajectory(

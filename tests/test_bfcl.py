@@ -75,7 +75,7 @@ def test_run_benchmark_on_the_bfcl_slice():
 def test_load_sample_bfcl_multiple_split_has_candidate_tools():
     cases = load_sample_bfcl(split="multiple")
     assert len(cases) == 25
-    # the whole point of this split: every case offers a real choice of tools
+    # this split offers several candidate tools per case
     assert all(len(c.tools) >= 2 for c in cases)
     for case in cases:
         assert case.expected_tool in [t["name"] for t in case.tools]
