@@ -6,6 +6,14 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-06-11
+
+### Fixed
+
+- `agentsynth bench --submit` now sends an `agentsynth/<version>` user-agent. The
+  default urllib user-agent is blocked by some WAFs (Cloudflare returns HTTP 403,
+  error 1010), which kept submissions from reaching a hub behind a proxy.
+
 ## [0.6.0] - 2026-06-11
 
 ### Added
