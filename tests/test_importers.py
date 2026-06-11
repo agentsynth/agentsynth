@@ -144,6 +144,114 @@ def test_round_trip_from_generated_trajectory():
     assert back.final_answer == source.final_answer
 
 
+# --- OpenTelemetry GenAI spans ------------------------------------------------
+
+
+OTEL_SEMCONV_SPANS = [
+    {
+        "name": "chat gpt-4o",
+        "start_time_unix_nano": 100,
+        "attributes": {
+            "gen_ai.operation.name": "chat",
+            "gen_ai.input.messages": json.dumps(
+                [{"role": "user", "parts": [{"type": "text", "content": "Weather in Hanoi?"}]}]
+            ),
+            "gen_ai.output.messages": json.dumps(
+                [
+                    {
+                        "role": "assistant",
+                        "parts": [
+                            {"type": "text", "content": "Checking."},
+                            {
+                                "type": "tool_call",
+                                "name": "get_weather",
+                                "arguments": {"city": "Hanoi"},
+                            },
+                        ],
+                    }
+                ]
+            ),
+        },
+    },
+    {
+        "name": "execute_tool get_weather",
+        "start_time_unix_nano": 200,
+        # OTLP-JSON style attribute list, not a flat dict
+        "attributes": [
+            {"key": "gen_ai.operation.name", "value": {"stringValue": "execute_tool"}},
+            {"key": "gen_ai.tool.name", "value": {"stringValue": "get_weather"}},
+            {"key": "gen_ai.tool.call.arguments", "value": {"stringValue": '{"city": "Hanoi"}'}},
+            {"key": "gen_ai.tool.call.result", "value": {"stringValue": "Hanoi: 31C"}},
+        ],
+    },
+    {
+        "name": "chat gpt-4o",
+        "start_time_unix_nano": 300,
+        "attributes": {
+            "gen_ai.operation.name": "chat",
+            "gen_ai.output.messages": json.dumps(
+                [{"role": "assistant", "parts": [{"type": "text", "content": "31C in Hanoi."}]}]
+            ),
+        },
+    },
+]
+
+OTEL_FLAT_SPANS = [
+    {
+        "name": "chat",
+        "attributes": {
+            "gen_ai.prompt.0.role": "user",
+            "gen_ai.prompt.0.content": "Weather in Hanoi?",
+            "gen_ai.completion.0.role": "assistant",
+            "gen_ai.completion.0.content": "31C in Hanoi.",
+        },
+    }
+]
+
+
+def test_otel_semconv_spans_map_to_trajectory():
+    from agentsynth.importers import trajectory_from_otel_spans
+
+    traj = trajectory_from_otel_spans(OTEL_SEMCONV_SPANS)
+    assert traj.query == "Weather in Hanoi?"
+    assert traj.tool_names_used() == ["get_weather", "get_weather"]  # chat part + tool span
+    assert traj.tool_calls()[0].tool_args == {"city": "Hanoi"}
+    assert any("31C" in (s.observation or "") for s in traj.steps)
+    assert traj.final_answer == "31C in Hanoi."
+    assert traj.metadata["source"] == "trace:otel"
+
+
+def test_otel_spans_are_ordered_by_start_time():
+    from agentsynth.importers import trajectory_from_otel_spans
+
+    shuffled = [OTEL_SEMCONV_SPANS[2], OTEL_SEMCONV_SPANS[0], OTEL_SEMCONV_SPANS[1]]
+    traj = trajectory_from_otel_spans(shuffled)
+    assert traj.final_answer == "31C in Hanoi."  # last by time, not by list order
+
+
+def test_otel_flattened_keys_map_to_trajectory():
+    from agentsynth.importers import trajectory_from_otel_spans
+
+    traj = trajectory_from_otel_spans(OTEL_FLAT_SPANS)
+    assert traj.query == "Weather in Hanoi?"
+    assert traj.final_answer == "31C in Hanoi."
+
+
+def test_import_traces_detects_otel_records():
+    trajs = import_traces([{"spans": OTEL_SEMCONV_SPANS}, OPENAI_TRACE])
+    assert len(trajs) == 2
+    assert trajs[0].metadata["source"] == "trace:otel"
+    assert trajs[1].metadata["source"] == "trace:openai"
+
+
+def test_otel_junk_spans_are_tolerated():
+    from agentsynth.importers import trajectory_from_otel_spans
+
+    spans = [{"name": "db query", "attributes": {"db.system": "postgres"}}] + OTEL_FLAT_SPANS
+    traj = trajectory_from_otel_spans(spans)
+    assert traj.query == "Weather in Hanoi?"
+
+
 def test_explicit_format_and_empty_records():
     assert import_traces([], format="openai") == []
     assert import_traces([{"messages": []}, {"nope": 1}]) == []

@@ -207,15 +207,161 @@ def _wrap(
     )
 
 
+def _flat_attrs(span: Dict[str, Any]) -> Dict[str, Any]:
+    """Span attributes, whether a flat dict or the OTLP-JSON key/value list."""
+    attrs = span.get("attributes") or {}
+    if isinstance(attrs, dict):
+        return attrs
+    flat: Dict[str, Any] = {}
+    for item in attrs:
+        if not isinstance(item, dict) or "key" not in item:
+            continue
+        value = item.get("value") or {}
+        if isinstance(value, dict):
+            for field in ("stringValue", "intValue", "doubleValue", "boolValue"):
+                if field in value:
+                    value = value[field]
+                    break
+        flat[item["key"]] = value
+    return flat
+
+
+def _maybe_json(value: Any) -> Any:
+    if isinstance(value, str) and value.strip().startswith(("[", "{")):
+        try:
+            return json.loads(value)
+        except ValueError:
+            return value
+    return value
+
+
+def _otel_to_openai(message: Any) -> Optional[Dict[str, Any]]:
+    """One semconv message ({role, parts} or {role, content}) to OpenAI shape."""
+    if not isinstance(message, dict):
+        return None
+    role = message.get("role") or "assistant"
+    if "parts" not in message:
+        return {"role": role, "content": str(message.get("content") or "")}
+    texts: List[str] = []
+    tool_calls: List[Dict[str, Any]] = []
+    for part in message.get("parts") or []:
+        if not isinstance(part, dict):
+            continue
+        if part.get("type") == "text":
+            texts.append(str(part.get("content") or ""))
+        elif part.get("type") == "tool_call":
+            tool_calls.append(
+                {
+                    "function": {
+                        "name": part.get("name"),
+                        "arguments": _maybe_json(part.get("arguments")) or {},
+                    }
+                }
+            )
+        elif part.get("type") == "tool_call_response":
+            return {
+                "role": "tool",
+                "content": str(part.get("result") or part.get("response") or ""),
+            }
+    out: Dict[str, Any] = {"role": role, "content": "\n".join(t for t in texts if t)}
+    if tool_calls:
+        out["tool_calls"] = tool_calls
+    return out
+
+
+def _flattened_otel_messages(attrs: Dict[str, Any], prefix: str) -> List[Dict[str, Any]]:
+    """Rebuild messages from flattened keys (gen_ai.prompt.0.role / .content, ...)."""
+    by_index: Dict[int, Dict[str, Any]] = {}
+    for key, value in attrs.items():
+        parts = key.split(".")
+        if len(parts) >= 4 and parts[0] == "gen_ai" and parts[1] == prefix and parts[2].isdigit():
+            by_index.setdefault(int(parts[2]), {})[".".join(parts[3:])] = value
+    messages = []
+    for index in sorted(by_index):
+        fields = by_index[index]
+        message: Dict[str, Any] = {
+            "role": fields.get("role", "user" if prefix == "prompt" else "assistant"),
+            "content": fields.get("content", ""),
+        }
+        name = fields.get("tool_calls.0.name") or fields.get("function_call.name")
+        if name:
+            args = fields.get("tool_calls.0.arguments") or fields.get("function_call.arguments")
+            message["tool_calls"] = [{"function": {"name": name, "arguments": args or {}}}]
+        messages.append(message)
+    return messages
+
+
+def trajectory_from_otel_spans(
+    spans: Sequence[Dict[str, Any]],
+    tools: Optional[Sequence[Any]] = None,
+    query: Optional[str] = None,
+) -> Trajectory:
+    """OpenTelemetry GenAI spans to a Trajectory.
+
+    The GenAI semconv is still incubating, so two common encodings are accepted:
+    `gen_ai.input.messages` / `gen_ai.output.messages` JSON attributes on chat
+    spans, and flattened `gen_ai.prompt.{i}.*` / `gen_ai.completion.{i}.*` keys.
+    Tool spans (`gen_ai.operation.name` == "execute_tool") become a tool call
+    plus its observation. Spans are ordered by `start_time_unix_nano` when present.
+    """
+    ordered = sorted(spans, key=lambda s: int(s.get("start_time_unix_nano") or 0))
+    messages: MessageList = []
+    saw_input = False
+
+    for span in ordered:
+        attrs = _flat_attrs(span)
+        operation = attrs.get("gen_ai.operation.name") or str(span.get("name") or "")
+        if operation.startswith("execute_tool") or attrs.get("gen_ai.tool.name"):
+            name = attrs.get("gen_ai.tool.name") or operation.replace("execute_tool ", "")
+            args = _maybe_json(attrs.get("gen_ai.tool.call.arguments")) or {}
+            messages.append(
+                {
+                    "role": "assistant",
+                    "content": "",
+                    "tool_calls": [{"function": {"name": name, "arguments": args}}],
+                }
+            )
+            result = attrs.get("gen_ai.tool.call.result")
+            if result is not None:
+                messages.append({"role": "tool", "content": str(result)})
+            continue
+
+        inputs = _maybe_json(attrs.get("gen_ai.input.messages"))
+        if not isinstance(inputs, list):
+            inputs = _flattened_otel_messages(attrs, "prompt")
+        if inputs and not saw_input:
+            saw_input = True
+            for message in inputs:
+                converted = _otel_to_openai(message)
+                if converted:
+                    messages.append(converted)
+
+        outputs = _maybe_json(attrs.get("gen_ai.output.messages"))
+        if not isinstance(outputs, list):
+            outputs = _flattened_otel_messages(attrs, "completion")
+        for message in outputs or []:
+            converted = _otel_to_openai(message)
+            if converted:
+                messages.append(converted)
+
+    return trajectory_from_messages(messages, tools=tools, query=query, source="otel")
+
+
 def import_traces(
     records: Sequence[Union[MessageList, Dict[str, Any]]],
     tools: Optional[Sequence[Any]] = None,
     format: str = "auto",
 ) -> List[Trajectory]:
-    """Convert a batch of traces. Each record is a message list or a dict holding one
-    under a `messages` key. `format` is `auto`, `openai`, or `anthropic`."""
+    """Convert a batch of traces. Each record is a message list, a dict with a
+    `messages` key, or a dict with a `spans` key (OTel). `format` is `auto`,
+    `openai`, `anthropic`, or `otel`."""
     trajectories: List[Trajectory] = []
     for record in records:
+        if isinstance(record, dict) and (format in ("auto", "otel")) and "spans" in record:
+            spans = record.get("spans")
+            if isinstance(spans, list) and spans:
+                trajectories.append(trajectory_from_otel_spans(spans, tools=tools))
+            continue
         messages = record.get("messages") if isinstance(record, dict) else record
         if not isinstance(messages, list) or not messages:
             continue
@@ -241,6 +387,7 @@ def load_traces_jsonl(
 __all__ = [
     "trajectory_from_messages",
     "trajectory_from_anthropic",
+    "trajectory_from_otel_spans",
     "import_traces",
     "load_traces_jsonl",
 ]
