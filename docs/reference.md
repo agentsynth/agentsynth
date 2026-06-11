@@ -58,6 +58,8 @@ The public surface, re-exported from the top-level `agentsynth` package.
 
 ::: agentsynth.load_traces_jsonl
 
+::: agentsynth.importers.trajectory_from_otel_spans
+
 ## Flywheel
 
 ::: agentsynth.mine_failures
@@ -65,6 +67,8 @@ The public surface, re-exported from the top-level `agentsynth` package.
 ::: agentsynth.mine_judge_failures
 
 ::: agentsynth.recipe_from_failures
+
+::: agentsynth.evolve_queries
 
 ## RL
 

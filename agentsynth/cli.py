@@ -25,7 +25,7 @@ def _build_parser() -> argparse.ArgumentParser:
             "Works fully offline (deterministic mock) with no API keys."
         ),
     )
-    sub = parser.add_subparsers(dest="command", metavar="{generate,eval}")
+    sub = parser.add_subparsers(dest="command", metavar="{generate,eval,import,flywheel}")
 
     gen = sub.add_parser(
         "generate",
@@ -107,6 +107,35 @@ def _build_parser() -> argparse.ArgumentParser:
         default=None,
         metavar="PATH",
         help="Optional path to write per-trajectory flat scores as JSONL.",
+    )
+
+    imp = sub.add_parser(
+        "import",
+        help="Convert agent traces (OpenAI/Anthropic/OTel logs) into a trajectory dataset.",
+        description="Read one trace per line, convert to trajectories, write JSONL.",
+    )
+    imp.add_argument("--in", "-i", dest="in_path", required=True, metavar="PATH")
+    imp.add_argument("--out", "-o", default="./imported_trajectories.jsonl", metavar="PATH")
+    imp.add_argument(
+        "--trace-format",
+        choices=("auto", "openai", "anthropic", "otel"),
+        default="auto",
+        help="Trace format (default: auto-detect per record).",
+    )
+
+    fly = sub.add_parser(
+        "flywheel",
+        help="Judge a dataset, mine its failures, and generate a verified patch dataset.",
+        description="One turn of the loop: evaluate -> mine failures -> regenerate.",
+    )
+    fly.add_argument("--in", "-i", dest="in_path", required=True, metavar="PATH")
+    fly.add_argument("--out", "-o", default="./flywheel_patch.jsonl", metavar="PATH")
+    fly.add_argument("--k", type=int, default=20, help="Patch dataset size (default: 20).")
+    fly.add_argument(
+        "--threshold",
+        type=float,
+        default=0.7,
+        help="Judge dimensions under this score count as failures (default: 0.7).",
     )
 
     return parser
@@ -203,6 +232,55 @@ def _write_eval_scores(results: Sequence, out_path: str) -> None:
             fh.write(json.dumps(res.flat(), ensure_ascii=False) + "\n")
 
 
+def _cmd_import(args: argparse.Namespace) -> int:
+    from .exporters import to_jsonl
+    from .importers import load_traces_jsonl
+
+    if not os.path.exists(args.in_path):
+        raise SystemExit(f"error: input file not found: '{args.in_path}'")
+    trajectories = load_traces_jsonl(args.in_path, format=args.trace_format)
+    if not trajectories:
+        print(f"No traces recognized in '{args.in_path}'.")
+        return 1
+    to_jsonl(trajectories, args.out)
+    sources: Dict[str, int] = {}
+    for traj in trajectories:
+        src = traj.metadata.get("source", "?")
+        sources[src] = sources.get(src, 0) + 1
+    breakdown = ", ".join(f"{s}={n}" for s, n in sorted(sources.items()))
+    print(f"Imported {len(trajectories)} trajectories [{breakdown}] -> {args.out}")
+    return 0
+
+
+def _cmd_flywheel(args: argparse.Namespace) -> int:
+    from .evaluator import TrajectoryEvaluator
+    from .exporters import load_jsonl, to_jsonl
+    from .mining import mine_judge_failures, recipe_from_failures
+    from .pipelines import run_recipe
+
+    if not os.path.exists(args.in_path):
+        raise SystemExit(f"error: input file not found: '{args.in_path}'")
+    trajectories = load_jsonl(args.in_path)
+    if not trajectories:
+        print(f"No trajectories found in '{args.in_path}'.")
+        return 1
+
+    results = TrajectoryEvaluator().evaluate_batch(trajectories)
+    mined = mine_judge_failures(trajectories, results, threshold=args.threshold)
+    print(mined.summary_md())
+    if not mined.failures:
+        print("Nothing under the threshold — no patch needed.")
+        return 0
+
+    patch = run_recipe(recipe_from_failures(mined, k=args.k))
+    to_jsonl(patch.trajectories, args.out)
+    print(
+        f"Patch dataset: {len(patch.trajectories)} trajectories "
+        f"(verified_rate={patch.metrics.get('verified_rate')}) -> {args.out}"
+    )
+    return 0
+
+
 def main(argv: Optional[List[str]] = None) -> int:
     """CLI entry point. Returns a process exit code (0 on success)."""
     if argv is None:
@@ -223,6 +301,10 @@ def main(argv: Optional[List[str]] = None) -> int:
         return _cmd_generate(args)
     if args.command == "eval":
         return _cmd_eval(args)
+    if args.command == "import":
+        return _cmd_import(args)
+    if args.command == "flywheel":
+        return _cmd_flywheel(args)
 
     # Unreachable given argparse validation.
     parser.print_help()

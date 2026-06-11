@@ -33,6 +33,7 @@ from .environments import (
     SQLEnvironment,
 )
 from .evaluator import TrajectoryEvaluator
+from .evolve import evolve_queries
 from .exporters import (
     load_jsonl,
     save_dataset,
@@ -43,7 +44,7 @@ from .exporters import (
 from .generator import AgentTrajectoryGenerator
 from .hub import dataset_card, prepare_dataset_dir, push_dataset
 from .importers import import_traces, load_traces_jsonl, trajectory_from_messages
-from .metrics import compute_dataset_metrics, diversity_score
+from .metrics import compute_dataset_metrics, diversity_score, run_report_md
 from .mining import (
     FailureReport,
     mine_failures,
@@ -163,6 +164,8 @@ __all__ = [
     "load_traces_jsonl",
     "trajectory_from_messages",
     # flywheel
+    "evolve_queries",
+    "run_report_md",
     "FailureReport",
     "mine_failures",
     "mine_judge_failures",

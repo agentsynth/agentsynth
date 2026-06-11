@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from .base import CompositeEnvironment, Environment
 from .browser import BrowserEnvironment
+from .docker_sandbox import DockerSandbox
 from .mcp_env import MCPEnvironment
 from .python_sandbox import PythonSandbox
 from .rest import RestEnvironment
@@ -16,5 +17,6 @@ __all__ = [
     "PythonSandbox",
     "MCPEnvironment",
     "BrowserEnvironment",
+    "DockerSandbox",
     "RestEnvironment",
 ]

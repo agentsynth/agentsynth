@@ -32,13 +32,14 @@ tool that runs in an isolated subprocess, a seed-task taxonomy, and YAML recipes
 - [x] `environments/`: pluggable execution backends — SQLite (`sql_query`) and an
       isolated Python subprocess (`python`) are in
 - [x] A browser environment (headless Chromium via Playwright)
+- [x] A Docker sandbox for untrusted generated code (`DockerSandbox`)
 - [x] A REST environment: any OpenAPI spec becomes runnable tools (`RestEnvironment`)
 - [ ] More environments: a hardened sandbox (gVisor/e2b-style), a virtual filesystem
 - [x] A seed-task taxonomy spanning domains and modes
 - [x] Scenarios with outcome checkers: seedable worlds + end-state assertions, packs in YAML
 - [x] Failure mining: categorize benchmark/judge misses and aim the next run at them
       (`mine_failures` → `recipe_from_failures` — the flywheel's last leg)
-- [ ] Self-Instruct / Evol-Instruct expansion of the taxonomy for diversity and difficulty
+- [x] Query evolution: template or LLM-paraphrase expansion (`evolve_queries`)
 - [ ] Persona and environment injection to fight mode collapse
 - [x] Concurrent batches via a recipe runner (`max_workers`)
 - [x] Cost tracking, caching, budget caps, and resumable runs (`agentsynth.scale`)
@@ -89,7 +90,7 @@ result.
 - [x] OpenAPI / REST connector (`RestEnvironment`)
 - [x] **RL-native**: gym-style episodes with verified rewards over any environment,
       TRL-compatible reward functions, and an OpenEnv bridge (`agentsynth.rl`)
-- [x] Trace importers: OpenAI / Anthropic agent logs become verifiable trajectories
+- [x] Trace importers: OpenAI / Anthropic / OpenTelemetry GenAI logs become verifiable trajectories
 - [ ] Connectors: LangChain and LlamaIndex tool definitions
 - [ ] A plugin interface for custom generators, judges, and environments
 

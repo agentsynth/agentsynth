@@ -398,8 +398,40 @@ def metrics_summary_md(metrics: Dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def run_report_md(result: Any, meter: Optional[Any] = None) -> str:
+    """One-page markdown summary of a RunResult, with costs when a meter is given."""
+    trajectories = result.trajectories
+    lines = [f"# Run report — {len(trajectories)} trajectories", ""]
+    for key in ("pass_rate", "verified_rate", "diversity"):
+        if result.metrics.get(key) is not None:
+            lines.append(f"- {key}: {result.metrics[key]}")
+    if result.duplicates_removed:
+        lines.append(f"- duplicates removed: {result.duplicates_removed}")
+
+    modes: Dict[str, int] = {}
+    domains: Dict[str, int] = {}
+    for traj in trajectories:
+        modes[traj.mode] = modes.get(traj.mode, 0) + 1
+        if traj.domain:
+            domains[traj.domain] = domains.get(traj.domain, 0) + 1
+    if modes:
+        lines.append("- modes: " + ", ".join(f"{m}={n}" for m, n in sorted(modes.items())))
+    if domains:
+        top = sorted(domains.items(), key=lambda kv: -kv[1])[:8]
+        lines.append("- domains: " + ", ".join(f"{d}={n}" for d, n in top))
+    if result.output_path:
+        lines.append(f"- exported to: {result.output_path}")
+    if meter is not None:
+        usage = meter.report()
+        lines.append(
+            f"- llm usage: {usage['calls']} calls, {usage['total_tokens']} tokens, ${usage['usd']}"
+        )
+    return "\n".join(lines)
+
+
 __all__ = [
     "compute_dataset_metrics",
+    "run_report_md",
     "diversity_score",
     "plot_rubric_radar",
     "plot_score_distribution",
