@@ -35,6 +35,7 @@ tool that runs in an isolated subprocess, a seed-task taxonomy, and YAML recipes
 - [x] A REST environment: any OpenAPI spec becomes runnable tools (`RestEnvironment`)
 - [ ] More environments: a hardened sandbox (gVisor/e2b-style), a virtual filesystem
 - [x] A seed-task taxonomy spanning domains and modes
+- [x] Scenarios with outcome checkers: seedable worlds + end-state assertions, packs in YAML
 - [x] Failure mining: categorize benchmark/judge misses and aim the next run at them
       (`mine_failures` → `recipe_from_failures` — the flywheel's last leg)
 - [ ] Self-Instruct / Evol-Instruct expansion of the taxonomy for diversity and difficulty

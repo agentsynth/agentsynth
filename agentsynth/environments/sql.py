@@ -82,10 +82,14 @@ class SQLEnvironment(Environment):
         schema: str = _SCHEMA,
         rows: Optional[Sequence[Tuple[Any, ...]]] = None,
         table: str = "sales",
+        read_only: bool = True,
     ) -> None:
         self._schema = schema
         self._rows = list(_ROWS if rows is None else rows)
         self._table = table
+        # Scenarios flip this off: the database is in-memory and re-seeded on reset,
+        # so letting the agent mutate it is the point — the end state gets checked.
+        self.read_only = read_only
         # check_same_thread=False + a lock so the concurrent runner can share one env.
         self._lock = threading.Lock()
         self._conn = sqlite3.connect(":memory:", check_same_thread=False)
@@ -107,11 +111,22 @@ class SQLEnvironment(Environment):
     def close(self) -> None:
         self._conn.close()
 
+    def rows(self, sql: str) -> List[Tuple[Any, ...]]:
+        """Raw result rows, for fixtures and outcome checks — not exposed as a tool."""
+        with self._lock:
+            return [tuple(r) for r in self._conn.execute(sql).fetchall()]
+
     def tools(self) -> List[ToolSpec]:
-        desc = (
-            "Run a read-only SQL SELECT against an analytics database. "
-            f"Table `{self._table}`(region, product, quarter, revenue, units)."
-        )
+        if self.read_only:
+            desc = (
+                "Run a read-only SQL SELECT against an analytics database. "
+                f"Table `{self._table}`(region, product, quarter, revenue, units)."
+            )
+        else:
+            desc = (
+                "Run SQL (SELECT, INSERT, UPDATE, DELETE) against the task database. "
+                f"Main table: `{self._table}`."
+            )
         return [
             ToolSpec(
                 name="sql_query",
@@ -133,11 +148,16 @@ class SQLEnvironment(Environment):
         if not sql:
             return "SQLError: empty query"
         head = sql.lower().lstrip("( \n\t")
-        if not (head.startswith("select") or head.startswith("with")):
+        is_read = head.startswith("select") or head.startswith("with")
+        if self.read_only and not is_read:
             return "SQLError: only read-only SELECT queries are allowed"
         try:
             with self._lock:
                 cur = self._conn.execute(sql)
+                if not is_read:
+                    self._conn.commit()
+                    affected = cur.rowcount if cur.rowcount >= 0 else 0
+                    return f"OK: {affected} row(s) affected"
                 rows = cur.fetchmany(50)
                 columns = [d[0] for d in cur.description] if cur.description else []
         # sqlite3.Warning (e.g. multiple statements) is not an Error subclass.

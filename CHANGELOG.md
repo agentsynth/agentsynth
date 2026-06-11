@@ -6,6 +6,16 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Scenarios (`agentsynth.scenarios`): a serializable bundle of environment config
+  (with per-episode seed state), task, and **outcome checkers** that assert on the
+  world's end state — `SqlCheck`, `HttpCheck`, `CalledTool`, `AnswerContains`.
+  `AgentGym.from_scenario` makes the outcome the dominant terminal reward
+  (0.6/0.2/0.2), `run_scenario_suite` turns a pack into an outcome benchmark, and
+  packs round-trip through YAML/JSON. `SQLEnvironment` gains `read_only=False` (for
+  scenario-owned worlds) and a `.rows()` helper for checks.
+
 ## [0.5.0] - 2026-06-11
 
 ### Added

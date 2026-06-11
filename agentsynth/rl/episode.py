@@ -106,6 +106,8 @@ class AgentGym:
         error_penalty: float = 0.02,
         require_grounding: bool = True,
         max_observation_chars: int = 4000,
+        scenario: Optional[Any] = None,
+        outcome_weight: float = 0.0,
         seed: int = 7,
     ) -> None:
         self.environment = environment
@@ -119,12 +121,25 @@ class AgentGym:
         self.error_penalty = error_penalty
         self.require_grounding = require_grounding
         self.max_observation_chars = max_observation_chars
+        self.scenario = scenario
+        self.outcome_weight = outcome_weight
         self.seed = seed
         self._steps: List[TrajectoryStep] = []
         self._rewards: List[float] = []
         self._actions_taken = 0
         self._episode_index = 0
         self._done = True  # call reset() to start an episode
+
+    @classmethod
+    def from_scenario(cls, scenario: Any, **kwargs: Any) -> "AgentGym":
+        """A gym whose episodes play out a Scenario: its environment (rebuilt with the
+        scenario's seed state), its task, and — dominant by default — its outcome
+        checks as the terminal reward (0.6 outcome / 0.2 verification / 0.2 judge)."""
+        kwargs.setdefault("outcome_weight", 0.6)
+        kwargs.setdefault("verify_weight", 0.2)
+        kwargs.setdefault("judge_weight", 0.2)
+        kwargs.setdefault("max_steps", scenario.max_steps)
+        return cls(scenario.build_environment(), task=scenario.task, scenario=scenario, **kwargs)
 
     # -- episode lifecycle -----------------------------------------------------
 
@@ -223,19 +238,31 @@ class AgentGym:
         )
         verify_credit = verification.score if (grounded or not self.require_grounding) else 0.0
         reward = self.verify_weight * verify_credit + self.judge_weight * judged.overall
+
+        info: Dict[str, Any] = {
+            "truncated": truncated,
+            "trajectory_id": trajectory.id,
+            "verification": verification.model_dump(),
+            "judge": judged.flat(),
+            "trajectory": trajectory,
+        }
+        if self.scenario is not None:
+            # The scenario's checkers assert on how the world actually ended up —
+            # the outcome is the part of the reward a policy can't talk its way into.
+            outcome_score, outcomes = self.scenario.run_checks(self.environment, trajectory)
+            reward += self.outcome_weight * outcome_score
+            info["outcome"] = {
+                "score": outcome_score,
+                "checks": [o.model_dump() for o in outcomes],
+            }
+
         self._rewards.append(reward)
         self._done = True
         return StepOutcome(
             observation=f"Episode finished: {answer or '(no answer)'}",
             reward=reward,
             done=True,
-            info={
-                "truncated": truncated,
-                "trajectory_id": trajectory.id,
-                "verification": verification.model_dump(),
-                "judge": judged.flat(),
-                "trajectory": trajectory,
-            },
+            info=info,
         )
 
     def _build_trajectory(self, answer: str, truncated: bool) -> Trajectory:

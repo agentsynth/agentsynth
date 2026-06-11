@@ -59,6 +59,16 @@ from .preferences import (
     to_dpo_jsonl,
 )
 from .rl import AgentGym, make_reward_fn
+from .scenarios import (
+    AnswerContains,
+    CalledTool,
+    HttpCheck,
+    Scenario,
+    SqlCheck,
+    load_scenarios,
+    run_scenario_suite,
+    save_scenarios,
+)
 from .schemas import (
     DEFAULT_RUBRIC_WEIGHTS,
     RUBRIC_DIMENSIONS,
@@ -133,6 +143,15 @@ __all__ = [
     # rl
     "AgentGym",
     "make_reward_fn",
+    # scenarios
+    "Scenario",
+    "SqlCheck",
+    "HttpCheck",
+    "CalledTool",
+    "AnswerContains",
+    "run_scenario_suite",
+    "load_scenarios",
+    "save_scenarios",
     # importers
     "import_traces",
     "load_traces_jsonl",

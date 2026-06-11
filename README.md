@@ -441,6 +441,31 @@ out = gym.step({"answer": "EMEA leads."})       # ends + verifies + scores
 whole loop — GRPO-train a base model against a REST API defined by nothing but its
 OpenAPI spec — on a free Colab T4.
 
+### Scenarios — verify the outcome, not the vibes
+
+A scenario bundles a world (an environment with its own seed state, rebuilt every
+episode), a task, and **checkers that assert on how the world ends up**. A policy
+that *says* it refunded the order scores nothing; one that actually changed the row
+gets paid — so RL rewards and dataset labels follow reality:
+
+```python
+from agentsynth import AgentGym, Scenario, SqlCheck, CalledTool
+
+scenario = Scenario(
+    id="refund-7",
+    task="Refund order 7 in the orders database, then confirm.",
+    environment={"type": "sql", "schema": "CREATE TABLE orders (id INTEGER PRIMARY KEY, status TEXT)",
+                 "rows": [[7, "paid"]], "table": "orders"},
+    checkers=[SqlCheck(query="SELECT status FROM orders WHERE id=7", equals=[["refunded"]]),
+              CalledTool(name="sql_query")],
+)
+gym = AgentGym.from_scenario(scenario)   # terminal reward: 0.6 outcome + 0.2 verify + 0.2 judge
+```
+
+Scenarios serialize to YAML/JSON (`save_scenarios` / `load_scenarios`), so packs are
+shareable, and `run_scenario_suite(policy, scenarios)` turns a pack into a benchmark
+with an outcome pass-rate. See [`examples/scenario_outcome.py`](examples/scenario_outcome.py).
+
 ### Import your production traces
 
 Your agent's logs are already a dataset — these make them trainable. OpenAI-style
