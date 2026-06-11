@@ -199,7 +199,8 @@ def leaderboard_page(pack: str = "core_v1") -> str:
     return f"""<!doctype html><html><head><meta charset="utf-8">
 <title>AgentSynth — {pack} leaderboard</title>
 <style>body{{font:16px/1.5 system-ui;max-width:720px;margin:3rem auto;padding:0 1rem;color:#1a1a1a}}
-table{{border-collapse:collapse;width:100%}}td,th{{padding:.5rem;border-bottom:1px solid #ddd;text-align:left}}
+table{{border-collapse:collapse;width:100%}}
+td,th{{padding:.5rem;border-bottom:1px solid #ddd;text-align:left}}
 code{{background:#f4f4f4;padding:.2rem .4rem;border-radius:4px;font-size:14px}}</style></head>
 <body><h1>{pack} leaderboard</h1>
 <p>Outcome-checked scenarios: a run passes only when the world ends up in the goal state.
