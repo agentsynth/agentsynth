@@ -490,10 +490,9 @@ with an outcome pass-rate. See [`examples/scenario_outcome.py`](examples/scenari
 
 ### Import your production traces
 
-Your agent's logs are already a dataset — these make them trainable. OpenAI-style
-`tool_calls` logs and Anthropic `tool_use` blocks both import into `Trajectory`
-objects, so the whole stack applies to real traffic: judge it, verify it, dedup it,
-mine its failures, export SFT/DPO.
+OpenAI-style `tool_calls` logs, Anthropic `tool_use` blocks, and OpenTelemetry
+GenAI spans all import into `Trajectory` objects, so the whole stack applies to
+real traffic: judge it, verify it, dedup it, mine its failures, export SFT/DPO.
 
 ```python
 from agentsynth import TrajectoryEvaluator, load_traces_jsonl
