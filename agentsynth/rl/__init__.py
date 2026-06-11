@@ -5,6 +5,7 @@ from __future__ import annotations
 from .collect import collect_episodes, episodes_to_rft_jsonl
 from .episode import AgentGym, EpisodeResult, StepOutcome, ToolAction
 from .openenv_bridge import FINAL_ANSWER_TOOL, to_openenv
+from .policy import llm_policy
 from .reward import episodes_to_grpo_jsonl, make_reward_fn, score_tool_completion
 
 __all__ = [
@@ -17,6 +18,7 @@ __all__ = [
     "episodes_to_grpo_jsonl",
     "collect_episodes",
     "episodes_to_rft_jsonl",
+    "llm_policy",
     "to_openenv",
     "FINAL_ANSWER_TOOL",
 ]

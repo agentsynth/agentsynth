@@ -50,3 +50,5 @@ site/
 
 # Proprietary cloud service (open-core; keep out of the public repo)
 cloud/
+hub.db
+test_hub.db

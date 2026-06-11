@@ -145,3 +145,18 @@ def test_cli_flywheel_with_nothing_to_fix(tmp_path):
 def test_cli_import_missing_file():
     with pytest.raises(SystemExit):
         cli_main(["import", "--in", "/nonexistent.jsonl"])
+
+
+def test_cli_bench_with_custom_policy(capsys):
+    code = cli_main(
+        ["bench", "--pack", "packs/core_v1.yaml", "--policy", "tests.bench_policy:lazy"]
+    )
+    assert code == 0
+    out = capsys.readouterr().out
+    assert "scenarios passed" in out
+    assert "FAIL" in out  # talk alone fails the state checks
+
+
+def test_cli_bench_requires_model_or_policy():
+    with pytest.raises(SystemExit):
+        cli_main(["bench", "--pack", "packs/core_v1.yaml"])

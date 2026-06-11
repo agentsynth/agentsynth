@@ -25,7 +25,7 @@ def _build_parser() -> argparse.ArgumentParser:
             "Works fully offline (deterministic mock) with no API keys."
         ),
     )
-    sub = parser.add_subparsers(dest="command", metavar="{generate,eval,import,flywheel}")
+    sub = parser.add_subparsers(dest="command", metavar="{generate,eval,import,flywheel,bench}")
 
     gen = sub.add_parser(
         "generate",
@@ -136,6 +136,35 @@ def _build_parser() -> argparse.ArgumentParser:
         type=float,
         default=0.7,
         help="Judge dimensions under this score count as failures (default: 0.7).",
+    )
+
+    bench = sub.add_parser(
+        "bench",
+        help="Run a scenario pack and report the outcome pass-rate.",
+        description="Score a model (or a custom policy) against an outcome-checked pack.",
+    )
+    bench.add_argument(
+        "--pack",
+        default="packs/core_v1.yaml",
+        metavar="PATH",
+        help="Scenario pack file (default: packs/core_v1.yaml).",
+    )
+    bench.add_argument("--model", default=None, help="LiteLLM model id to drive the episodes.")
+    bench.add_argument(
+        "--policy",
+        default=None,
+        metavar="MODULE:FUNC",
+        help="A custom policy instead of --model, e.g. mypkg.policies:my_policy.",
+    )
+    bench.add_argument("--seed", type=int, default=7)
+    bench.add_argument(
+        "--submit",
+        default=None,
+        metavar="URL",
+        help="Hub base URL to submit the result to (e.g. https://api.agentsynth.tech).",
+    )
+    bench.add_argument(
+        "--name", default=None, help="Label for the submission (defaults to --model)."
     )
 
     return parser
@@ -281,6 +310,73 @@ def _cmd_flywheel(args: argparse.Namespace) -> int:
     return 0
 
 
+def _resolve_policy(args: argparse.Namespace):
+    if args.policy:
+        import importlib
+
+        module_name, _, attr = args.policy.partition(":")
+        if not attr:
+            raise SystemExit("error: --policy needs the form module:function")
+        return getattr(importlib.import_module(module_name), attr)
+    if args.model:
+        from .rl import llm_policy
+        from .scale import CachingLLMClient
+
+        client = CachingLLMClient(model=args.model)
+        if not client.available:
+            raise SystemExit(
+                f"error: model '{args.model}' is not usable ({client.last_error}); "
+                "set the provider key, or use --policy"
+            )
+        return llm_policy(client)
+    raise SystemExit("error: pass --model <litellm id> or --policy module:function")
+
+
+def _cmd_bench(args: argparse.Namespace) -> int:
+    from .scenarios import load_scenarios, run_scenario_suite
+
+    if not os.path.exists(args.pack):
+        raise SystemExit(f"error: pack not found: '{args.pack}'")
+    scenarios = load_scenarios(args.pack)
+    policy = _resolve_policy(args)
+
+    report = run_scenario_suite(policy, scenarios, seed=args.seed)
+    for row in report.results:
+        mark = "pass" if row["passed"] else "FAIL"
+        print(f"[{mark}] {row['id']}  outcome={row['outcome_score']:.2f}")
+    print(f"\n{report.passed}/{report.n} scenarios passed (pass_rate={report.pass_rate})")
+
+    if args.submit:
+        from . import __version__
+
+        name = args.name or args.model or args.policy or "anonymous"
+        payload = {
+            "pack_id": os.path.splitext(os.path.basename(args.pack))[0],
+            "model": name,
+            "report": report.model_dump(),
+            "client_version": __version__,
+        }
+        url = args.submit.rstrip("/") + "/v1/submissions"
+        print(f"submitting to {url} ...")
+        print(_post_json(url, payload))
+    return 0
+
+
+def _post_json(url: str, payload: Dict) -> str:
+    import json
+    from urllib import error, request
+
+    data = json.dumps(payload).encode("utf-8")
+    req = request.Request(url, data=data, headers={"Content-Type": "application/json"})
+    try:
+        with request.urlopen(req, timeout=30) as resp:
+            return resp.read().decode("utf-8", "replace")
+    except error.HTTPError as exc:
+        return f"submit failed: HTTP {exc.code} {exc.read().decode('utf-8', 'replace')[:200]}"
+    except Exception as exc:
+        return f"submit failed: {exc}"
+
+
 def main(argv: Optional[List[str]] = None) -> int:
     """CLI entry point. Returns a process exit code (0 on success)."""
     if argv is None:
@@ -305,6 +401,8 @@ def main(argv: Optional[List[str]] = None) -> int:
         return _cmd_import(args)
     if args.command == "flywheel":
         return _cmd_flywheel(args)
+    if args.command == "bench":
+        return _cmd_bench(args)
 
     # Unreachable given argparse validation.
     parser.print_help()

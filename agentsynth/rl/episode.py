@@ -61,6 +61,8 @@ def _coerce_action(action: ActionLike) -> ToolAction:
         parsed = extract_json(action)
         if isinstance(parsed, dict) and ("tool" in parsed or "tool_name" in parsed):
             action = parsed
+        elif isinstance(parsed, dict) and "answer" in parsed:
+            return ToolAction(answer=str(parsed["answer"]))
         else:
             return ToolAction(answer=action)
     if isinstance(action, dict):
@@ -158,6 +160,17 @@ class AgentGym:
     @property
     def step_count(self) -> int:
         return self._actions_taken
+
+    def transcript(self, max_chars: int = 4000) -> str:
+        """The episode so far as compact text, newest steps kept when truncating."""
+        lines = []
+        for step in self._steps:
+            if step.step_type == "tool_call":
+                lines.append(f"call {step.tool_name}({step.tool_args or {}})")
+            elif step.step_type == "observation":
+                lines.append(f"-> {step.observation}")
+        text = "\n".join(lines)
+        return text[-max_chars:] if len(text) > max_chars else text
 
     def state(self) -> Dict[str, Any]:
         return {
