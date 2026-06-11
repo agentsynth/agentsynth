@@ -6,6 +6,21 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.6.2] - 2026-06-12
+
+### Added
+
+- `agentsynth bench --pack` takes a pack name or URL on top of a file path. Names
+  resolve against the local `packs/` directory first and fall back to the hub, so
+  a pip-only install can bench `core_v1` with nothing cloned. New `--hub` option
+  (default `https://api.agentsynth.tech`); a bare `--submit` posts the run there.
+
+### Fixed
+
+- PyYAML ships with the base install. Scenario packs, recipes, and OpenAPI specs
+  parse YAML, and a plain `pip install agentsynth-ai` crashed on all three
+  (`ModuleNotFoundError: yaml`) — it was only pulled in by extras.
+
 ## [0.6.1] - 2026-06-11
 
 ### Fixed
