@@ -17,6 +17,7 @@ are inferred from the calls.
 from __future__ import annotations
 
 import json
+import re
 from typing import Any, Dict, List, Optional, Sequence, Union
 
 from .schemas import ToolSpec, Trajectory, TrajectoryStep
@@ -384,10 +385,61 @@ def load_traces_jsonl(
     return import_traces(records, tools=tools, format=format)
 
 
+# Conservative by design: secrets and contact details go, plain numbers stay
+# ("order 7" must survive). Phones need separators or a leading + to match.
+_REDACTIONS = [
+    ("email", re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")),
+    ("token", re.compile(r"\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{4,}")),
+    ("token", re.compile(r"(?i)\bbearer\s+[A-Za-z0-9._+/=-]{12,}")),
+    ("api_key", re.compile(r"\b(?:sk|pk|rk)-[A-Za-z0-9_-]{16,}\b")),
+    ("api_key", re.compile(r"\bgh[pousr]_[A-Za-z0-9]{20,}\b")),
+    ("api_key", re.compile(r"\bAKIA[0-9A-Z]{16}\b")),
+    ("hex_id", re.compile(r"\b[0-9a-fA-F]{32,}\b")),
+    ("phone", re.compile(r"(?<![\w.])\+?\d{1,4}[ .-]\(?\d{2,4}\)?[ .-]\d{3,4}(?:[ .-]\d{2,4})?\b")),
+]
+
+
+def redact_text(text: str) -> str:
+    """Strip emails, keys, tokens, long hex ids, and phone-shaped numbers."""
+    for label, pattern in _REDACTIONS:
+        text = pattern.sub(f"[redacted-{label}]", text)
+    return text
+
+
+def _redact_value(value: Any) -> Any:
+    if isinstance(value, str):
+        return redact_text(value)
+    if isinstance(value, dict):
+        return {k: _redact_value(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_redact_value(v) for v in value]
+    return value
+
+
+def redact_trajectory(traj: Trajectory) -> Trajectory:
+    """Redact every text surface of a trajectory in place, then return it.
+
+    Run this before sharing or donating imported production traces.
+    """
+    traj.query = redact_text(traj.query or "")
+    if traj.final_answer:
+        traj.final_answer = redact_text(traj.final_answer)
+    for step in traj.steps:
+        for field in ("thought", "content", "observation", "code", "code_output"):
+            value = getattr(step, field, None)
+            if isinstance(value, str) and value:
+                setattr(step, field, redact_text(value))
+        if step.tool_args:
+            step.tool_args = _redact_value(step.tool_args)
+    return traj
+
+
 __all__ = [
     "trajectory_from_messages",
     "trajectory_from_anthropic",
     "trajectory_from_otel_spans",
     "import_traces",
     "load_traces_jsonl",
+    "redact_text",
+    "redact_trajectory",
 ]

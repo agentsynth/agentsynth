@@ -43,7 +43,13 @@ from .exporters import (
 )
 from .generator import AgentTrajectoryGenerator
 from .hub import dataset_card, prepare_dataset_dir, push_dataset
-from .importers import import_traces, load_traces_jsonl, trajectory_from_messages
+from .importers import (
+    import_traces,
+    load_traces_jsonl,
+    redact_text,
+    redact_trajectory,
+    trajectory_from_messages,
+)
 from .metrics import compute_dataset_metrics, diversity_score, run_report_md
 from .mining import (
     FailureReport,
@@ -162,6 +168,8 @@ __all__ = [
     # importers
     "import_traces",
     "load_traces_jsonl",
+    "redact_text",
+    "redact_trajectory",
     "trajectory_from_messages",
     # flywheel
     "evolve_queries",

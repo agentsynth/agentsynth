@@ -124,6 +124,11 @@ def _build_parser() -> argparse.ArgumentParser:
         default="auto",
         help="Trace format (default: auto-detect per record).",
     )
+    imp.add_argument(
+        "--redact",
+        action="store_true",
+        help="Strip emails, keys, tokens, and phone-shaped numbers before export.",
+    )
 
     fly = sub.add_parser(
         "flywheel",
@@ -300,7 +305,7 @@ def _write_eval_scores(results: Sequence, out_path: str) -> None:
 
 def _cmd_import(args: argparse.Namespace) -> int:
     from .exporters import to_jsonl
-    from .importers import load_traces_jsonl
+    from .importers import load_traces_jsonl, redact_trajectory
 
     if not os.path.exists(args.in_path):
         raise SystemExit(f"error: input file not found: '{args.in_path}'")
@@ -308,6 +313,9 @@ def _cmd_import(args: argparse.Namespace) -> int:
     if not trajectories:
         print(f"No traces recognized in '{args.in_path}'.")
         return 1
+    if args.redact:
+        trajectories = [redact_trajectory(t) for t in trajectories]
+        print("Redacted emails, keys, tokens, and phone-shaped numbers.")
     to_jsonl(trajectories, args.out)
     sources: Dict[str, int] = {}
     for traj in trajectories:

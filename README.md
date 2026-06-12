@@ -529,6 +529,10 @@ results = TrajectoryEvaluator().evaluate_batch(trajectories)
 keep = [t for t, r in zip(trajectories, results) if r.passed]
 ```
 
+Sharing traces outside your org? `agentsynth import --in logs.jsonl --redact`
+strips emails, API keys, bearer tokens, and phone-shaped numbers first
+(`redact_trajectory` does the same in code).
+
 ### Close the flywheel — mine failures into the next run
 
 A benchmark tells you *that* the model fails; `mine_failures` turns it into *what to
