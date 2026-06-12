@@ -884,7 +884,8 @@ footer{display:none !important}
 @media(max-width:760px){.vdims{grid-template-columns:1fr}.vname{flex-basis:120px}}
 
 .traj table.cmp{width:100%;border-collapse:collapse}
-.cmp td{padding:8px 6px;border-bottom:1px solid #e7e9ee;text-align:center;font-size:13.5px;color:#11141a}
+.cmp td{padding:8px 6px;border-bottom:1px solid #e7e9ee;text-align:center;
+  font-size:13.5px;color:#11141a}
 .cmp th{padding:8px 6px;border-bottom:1px solid #e7e9ee;text-align:center;font-size:11px;
   text-transform:uppercase;letter-spacing:.05em;color:#5b6471}
 .cmp td:first-child{text-align:left}
