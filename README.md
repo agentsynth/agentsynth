@@ -502,8 +502,11 @@ agentsynth bench --pack core_v1 --model claude-haiku-4-5-20251001 --submit
 
 `--policy mypkg.module:fn` benches your own agent loop instead of a LiteLLM model;
 `--submit` without a value posts to the default hub (override with `--hub`).
+`--trials 4` runs the pack four times and scores **pass^k** — a scenario counts
+only when every trial passes, the reliability number single-shot benchmarks hide.
 [`examples/core_v1_oracle.py`](examples/core_v1_oracle.py) is the reference
-solution — the ceiling every entry chases.
+solution — it inspects, acts, then verifies, and `agentsynth pack teach` exports
+its episodes as gold trajectories for SFT seeding.
 
 Packs are community-extensible — scaffold one for your domain and it gets its
 own live leaderboard once merged:
