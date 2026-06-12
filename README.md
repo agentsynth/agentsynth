@@ -9,6 +9,7 @@
   <a href="https://www.python.org/downloads/"><img alt="Python 3.9+" src="https://img.shields.io/badge/python-3.9%2B-blue.svg"></a>
   <a href="https://github.com/agentsynth/agentsynth/blob/main/LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-green.svg"></a>
   <a href="https://huggingface.co/spaces/agentsynth/agentsynth"><img alt="Hugging Face Spaces" src="https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Spaces-yellow.svg"></a>
+  <a href="https://agentsynth.tech/leaderboard"><img alt="live leaderboard" src="https://img.shields.io/badge/leaderboard-live-4f46e5.svg"></a>
 </p>
 
 <p align="center">
