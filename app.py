@@ -258,6 +258,54 @@ def do_agent_task(scenario_id: str) -> str:
     return f"**Task:** {scenario.task}" if scenario else ""
 
 
+def do_compare(policy_names: Optional[List[str]], model_choice: str, trials: float) -> str:
+    """The CLI's bench --compare, in the browser: one pass^k table across the pack."""
+    from agentsynth.cli import _run_trials
+
+    items = [(name, DEMO_POLICIES[name]) for name in policy_names or [] if name in DEMO_POLICIES]
+    model = _model_arg(model_choice)
+    if model:
+        policy = llm_policy_for(model)
+        if policy is None:
+            gr.Warning(
+                f"Model '{model}' isn't usable (missing key?) — comparing the scripted picks."
+            )
+        else:
+            items.append((model, policy))
+    if len(items) < 2:
+        return "_Pick at least two policies (or add a usable model) to compare._"
+
+    scenarios = list(_DEMO_SCENARIOS.values())
+    k = max(1, int(trials))
+    runs = []
+    for name, policy in items:
+        report, pass1_avg = _run_trials(policy, scenarios, seed=7, trials=k)
+        runs.append((name, report, pass1_avg))
+
+    head = "".join(f"<th>{_esc(name)}</th>" for name, _, _ in runs)
+    rows = []
+    for idx, row in enumerate(runs[0][1].results):
+        cells = "".join(
+            '<td class="cmp-ok">✓</td>'
+            if run[1].results[idx]["passed"]
+            else '<td class="cmp-fail">✗</td>'
+            for run in runs
+        )
+        rows.append(f'<tr><td class="mono">{_esc(row["id"])}</td>{cells}</tr>')
+    label = f"pass^{k}" if k > 1 else "pass rate"
+    footer = "".join(f"<td><b>{run[1].pass_rate:.0%}</b></td>" for run in runs)
+    extra = ""
+    if k > 1:
+        avgs = "".join(f"<td>{run[2]:.0%}</td>" for run in runs)
+        extra = f'<tr><td class="mono">pass^1 avg</td>{avgs}</tr>'
+    return (
+        '<div class="traj"><table class="cmp">'
+        f"<tr><th>scenario</th>{head}</tr>{''.join(rows)}"
+        f'<tr><td class="mono"><b>{label}</b></td>{footer}</tr>{extra}'
+        "</table></div>"
+    )
+
+
 def _verdict_card(ev: Any) -> str:
     """The judge verdict as a scorecard: overall, pass badge, one bar per dimension."""
     badge = (
@@ -835,6 +883,15 @@ footer{display:none !important}
 .vwhy{margin-top:10px;font-size:13px;color:#5b6471}
 @media(max-width:760px){.vdims{grid-template-columns:1fr}.vname{flex-basis:120px}}
 
+.traj table.cmp{width:100%;border-collapse:collapse}
+.cmp td{padding:8px 6px;border-bottom:1px solid #e7e9ee;text-align:center;font-size:13.5px;color:#11141a}
+.cmp th{padding:8px 6px;border-bottom:1px solid #e7e9ee;text-align:center;font-size:11px;
+  text-transform:uppercase;letter-spacing:.05em;color:#5b6471}
+.cmp td:first-child{text-align:left}
+.cmp th:first-child{text-align:left}
+.cmp-ok{color:#0f9d58;font-weight:800}
+.cmp-fail{color:#dc2626;font-weight:800}
+
 .ocheck{display:flex;align-items:flex-start;gap:10px;padding:6px 0;font-size:13.5px}
 .omark{flex:0 0 20px;text-align:center;font-weight:800;border-radius:5px}
 .omark.ok{color:#0f9d58}
@@ -876,6 +933,8 @@ footer{display:none !important}
 .dark .kpi-l{color:#9aa3b2}
 .dark .oname{color:#e6e9f0}
 .dark .odetail{color:#9aa3b2}
+.dark .cmp td{color:#e6e9f0;border-color:#272b36}
+.dark .cmp th{color:#9aa3b2;border-color:#272b36}
 """
 
 _THEME = gr.themes.Soft(
@@ -1069,6 +1128,31 @@ with gr.Blocks(title="AgentSynth — playground", **_BLOCKS_KW) as demo:
             inputs=[agent_scenario, agent_policy, agent_model],
             outputs=[agent_view],
         )
+
+    with gr.Tab("Compare"):
+        gr.Markdown(
+            "Line policies up against the whole pack — the CLI's `bench --compare`, "
+            "in the browser. Two trials by default, so flaky wins don't count."
+        )
+        with gr.Row():
+            cmp_policies = gr.CheckboxGroup(
+                choices=list(DEMO_POLICIES),
+                value=list(DEMO_POLICIES),
+                label="Scripted policies",
+                scale=3,
+            )
+            cmp_model = gr.Dropdown(
+                choices=_MODEL_CHOICES,
+                value=MOCK_LABEL,
+                label="Add an LLM (optional)",
+                allow_custom_value=True,
+                scale=2,
+            )
+            cmp_trials = gr.Slider(1, 3, value=2, step=1, label="Trials (pass^k)", scale=1)
+        cmp_btn = gr.Button("Run the comparison", variant="primary", elem_id="cmp-btn")
+        cmp_view = gr.Markdown("_Pick at least two policies, then run._")
+
+        cmp_btn.click(do_compare, inputs=[cmp_policies, cmp_model, cmp_trials], outputs=[cmp_view])
 
     with gr.Tab("Evaluate"):
         with gr.Row():

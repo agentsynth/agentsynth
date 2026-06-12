@@ -91,3 +91,15 @@ def test_agent_run_renders_outcome_and_timeline():
 def test_agent_run_guards_the_llm_policy():
     out = app.do_agent_run("refund-order", app._LLM_POLICY_LABEL, "mock (offline)")
     assert "needs a model id" in out
+
+
+def test_compare_tab_builds_the_pass_k_table():
+    out = app.do_compare(list(app.DEMO_POLICIES), "mock (offline)", 2)
+    assert "pass^2" in out and "pass^1 avg" in out
+    assert "✓" in out and "✗" in out
+    assert "100%" in out and "20%" in out and "0%" in out
+
+
+def test_compare_tab_needs_two_items():
+    out = app.do_compare(["lazy (just talks)"], "mock (offline)", 1)
+    assert "at least two" in out
