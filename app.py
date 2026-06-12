@@ -250,39 +250,53 @@ _PLOT_COLORWAY = ["#4f46e5", "#818cf8", "#0f9d58", "#f59e0b", "#ef4444", "#64748
 _PLOT_FONT = "-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif"
 
 
-def _brand(fig):
-    """One look for every chart: white, indigo, system font, tight margins."""
+def _brand(fig, dark: bool = False):
+    """One look for every chart, matched to the page theme the client reported."""
+    ink = "#e6e9f0" if dark else "#11141a"
+    bg = "#14161c" if dark else "#ffffff"
+    grid = "#272b36" if dark else "#e7e9ee"
+    accent = "#6366f1" if dark else "#4f46e5"
     fig.update_layout(
-        template="plotly_white",
+        template="plotly_dark" if dark else "plotly_white",
         colorway=_PLOT_COLORWAY,
-        font=dict(family=_PLOT_FONT, size=13, color="#11141a"),
-        title_font=dict(family=_PLOT_FONT, size=15, color="#11141a"),
-        paper_bgcolor="#ffffff",
-        plot_bgcolor="#ffffff",
+        font=dict(family=_PLOT_FONT, size=13, color=ink),
+        title_font=dict(family=_PLOT_FONT, size=15, color=ink),
+        paper_bgcolor=bg,
+        plot_bgcolor=bg,
         margin=dict(l=44, r=24, t=52, b=44),
     )
+    fig.update_xaxes(gridcolor=grid, zerolinecolor=grid)
+    fig.update_yaxes(gridcolor=grid, zerolinecolor=grid)
+    if getattr(fig.layout, "polar", None) and fig.layout.polar.radialaxis:
+        fig.update_polars(
+            bgcolor=bg,
+            radialaxis=dict(gridcolor=grid, linecolor=grid),
+            angularaxis=dict(gridcolor=grid, linecolor=grid),
+        )
     for trace in fig.data:
         kind = getattr(trace, "type", "")
         if kind in ("bar", "histogram"):
-            trace.update(marker_color="#4f46e5", marker_line_width=0)
+            trace.update(marker_color=accent, marker_line_width=0)
         elif kind == "scatterpolar":
-            trace.update(line_color="#4f46e5", fillcolor="rgba(79,70,229,0.22)")
+            trace.update(line_color=accent, fillcolor="rgba(99,102,241,0.25)")
+        elif kind == "box":
+            trace.update(line_color=accent)
         elif kind == "indicator":
             trace.update(
-                gauge_bar_color="#4f46e5",
-                gauge_bordercolor="#e7e9ee",
-                number_font_color="#11141a",
+                gauge_bar_color=accent,
+                gauge_bordercolor=grid,
+                number_font_color=ink,
             )
     return fig
 
 
-def _empty_fig(title: str = "No data yet"):
+def _empty_fig(title: str = "No data yet", dark: bool = False):
     """Blank Plotly figure to show before any data exists."""
     import plotly.graph_objects as go
 
     fig = go.Figure()
     fig.update_layout(title=title)
-    return _brand(fig)
+    return _brand(fig, dark)
 
 
 def _kpi_cards(metrics: Dict[str, Any]) -> str:
@@ -313,7 +327,7 @@ def _kpi_cards(metrics: Dict[str, Any]) -> str:
     return f'<div class="kpis">{items}</div>'
 
 
-def _fig_dim_spread(eval_results: Optional[List[Any]]):
+def _fig_dim_spread(eval_results: Optional[List[Any]], dark: bool = False):
     """Score distribution per rubric dimension — the variance the means hide."""
     import plotly.graph_objects as go
 
@@ -336,10 +350,12 @@ def _fig_dim_spread(eval_results: Optional[List[Any]]):
         )
     else:
         fig.update_layout(title="Rubric spread — run the judge first")
-    return _brand(fig)
+    return _brand(fig, dark)
 
 
-def _fig_score_vs_steps(trajectories: Optional[List[Any]], eval_results: Optional[List[Any]]):
+def _fig_score_vs_steps(
+    trajectories: Optional[List[Any]], eval_results: Optional[List[Any]], dark: bool = False
+):
     """Overall score against trajectory length — does rambling cost quality?"""
     import plotly.graph_objects as go
 
@@ -372,16 +388,16 @@ def _fig_score_vs_steps(trajectories: Optional[List[Any]], eval_results: Optiona
         )
     else:
         fig.update_layout(title="Score vs length — run the judge first")
-    return _brand(fig)
+    return _brand(fig, dark)
 
 
-def _five_empty_figs() -> Tuple[Any, Any, Any, Any, Any]:
+def _five_empty_figs(dark: bool = False) -> Tuple[Any, Any, Any, Any, Any]:
     return (
-        _empty_fig("Rubric radar — no data"),
-        _empty_fig("Score distribution — no data"),
-        _empty_fig("Rubric spread — no data"),
-        _empty_fig("Score vs length — no data"),
-        _empty_fig("Tool usage — no data"),
+        _empty_fig("Rubric radar — no data", dark),
+        _empty_fig("Score distribution — no data", dark),
+        _empty_fig("Rubric spread — no data", dark),
+        _empty_fig("Score vs length — no data", dark),
+        _empty_fig("Tool usage — no data", dark),
     )
 
 
@@ -552,26 +568,27 @@ def do_evaluate(
 def do_metrics(
     trajectories: Optional[List[Any]],
     eval_results: Optional[List[Any]],
+    dark: bool = False,
 ):
     """Compute dataset metrics and render the summary plus five plots."""
     if not trajectories:
         msg = "Generate trajectories first to see dataset metrics."
-        return (msg, *_five_empty_figs())
+        return (msg, *_five_empty_figs(dark))
 
     try:
         metrics = compute_dataset_metrics(trajectories, eval_results or None)
         summary = _kpi_cards(metrics)
 
-        radar = _brand(M.plot_rubric_radar(eval_results or None))
-        dist = _brand(M.plot_score_distribution(eval_results or None))
-        spread = _fig_dim_spread(eval_results or None)
-        scatter = _fig_score_vs_steps(trajectories, eval_results or None)
-        tools = _brand(M.plot_tool_usage(trajectories))
+        radar = _brand(M.plot_rubric_radar(eval_results or None), dark)
+        dist = _brand(M.plot_score_distribution(eval_results or None), dark)
+        spread = _fig_dim_spread(eval_results or None, dark)
+        scatter = _fig_score_vs_steps(trajectories, eval_results or None, dark)
+        tools = _brand(M.plot_tool_usage(trajectories), dark)
         return (summary, radar, dist, spread, scatter, tools)
 
     except Exception as exc:
         gr.Warning(f"Metrics failed: {exc}")
-        return (f"❌ Metrics failed: {exc}", *_five_empty_figs())
+        return (f"❌ Metrics failed: {exc}", *_five_empty_figs(dark))
 
 
 def do_export(
@@ -803,6 +820,15 @@ with gr.Blocks(title="AgentSynth — playground", **_BLOCKS_KW) as demo:
     traj_state = gr.State([])  # List[Trajectory]
     eval_state = gr.State([])  # List[EvalResult]
 
+    # The page reports its theme on load so server-rendered charts can match it.
+    dark_flag = gr.Checkbox(value=False, visible=False)
+    demo.load(
+        None,
+        inputs=None,
+        outputs=[dark_flag],
+        js="() => document.body.classList.contains('dark')",
+    )
+
     with gr.Tab("Generate"):
         with gr.Row(equal_height=True):
             with gr.Column(scale=7):
@@ -986,7 +1012,7 @@ with gr.Blocks(title="AgentSynth — playground", **_BLOCKS_KW) as demo:
 
         metrics_btn.click(
             do_metrics,
-            inputs=[traj_state, eval_state],
+            inputs=[traj_state, eval_state, dark_flag],
             outputs=[
                 metrics_summary,
                 plot_radar,
