@@ -646,6 +646,35 @@ footer{display:none !important}
 .vnum{flex:0 0 34px;text-align:right;font:12px ui-monospace,SFMono-Regular,monospace;color:#11141a}
 .vwhy{margin-top:10px;font-size:13px;color:#5b6471}
 @media(max-width:760px){.vdims{grid-template-columns:1fr}.vname{flex-basis:120px}}
+
+/* dark theme: the cards go dark too instead of floating as white islands.
+   One selector per rule — gradio's css scoper mangles comma lists under .dark. */
+.dark .traj{background:#14161c;border-color:#272b36}
+.dark .verdict{background:#14161c;border-color:#272b36}
+.dark .traj-query{color:#e6e9f0}
+.dark .step-body{color:#e6e9f0}
+.dark .answer-text{color:#e6e9f0}
+.dark .mono{color:#e6e9f0}
+.dark .mono b{color:#e6e9f0}
+.dark .vhead{color:#9aa3b2}
+.dark .vhead b{color:#e6e9f0}
+.dark .vnum{color:#e6e9f0}
+.dark .dim-text{color:#9aa3b2}
+.dark .vname{color:#9aa3b2}
+.dark .vwhy{color:#9aa3b2}
+.dark .traj-id{background:#1b1e27;border-color:#272b36;color:#9aa3b2}
+.dark .badge{background:rgba(99,102,241,.18);color:#a5b4fc}
+.dark .badge.soft{background:#1b1e27;color:#9aa3b2}
+.dark .badge.pass{background:rgba(16,185,129,.15);color:#34d399}
+.dark .badge.fail{background:rgba(239,68,68,.15);color:#f87171}
+.dark .chip.obs{background:#1b1e27;color:#9aa3b2;border-color:#272b36}
+.dark .chip.think{background:rgba(99,102,241,.18);color:#a5b4fc}
+.dark .steps:before{background:#272b36}
+.dark .traj-final{background:rgba(16,185,129,.08);color:#e6e9f0}
+.dark .vtrack{background:#272b36}
+.dark #as-header .links a{color:#9aa3b2}
+.dark #as-header .links a:hover{color:#a5b4fc}
+.dark #as-header .tag{background:rgba(99,102,241,.18)}
 """
 
 _THEME = gr.themes.Soft(
