@@ -3,11 +3,20 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
 <title>AgentSynth — agent training data you can verify</title>
 <meta name="description" content="AgentSynth generates synthetic tool-use trajectories, checks them against the world's end state, and turns them into RL rewards, benchmarks, and a live leaderboard. Offline-first, open source.">
+<link rel="canonical" href="https://agentsynth.tech/">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%234f46e5'/%3E%3Cpath d='M18 33l10 10 18-22' stroke='%23fff' stroke-width='7' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 <meta property="og:title" content="AgentSynth — agent training data you can verify">
 <meta property="og:description" content="Outcome-verified synthetic agent trajectories for fine-tuning agentic LLMs. Open source.">
 <meta property="og:type" content="website">
+<meta property="og:url" content="https://agentsynth.tech/">
+<meta property="og:image" content="https://agentsynth.tech/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="AgentSynth — agent training data you can verify">
+<meta name="twitter:description" content="Outcome-verified synthetic agent trajectories for fine-tuning agentic LLMs. Open source.">
+<meta name="twitter:image" content="https://agentsynth.tech/og.png">
 <style>
   :root{
     --bg:#ffffff; --ink:#11141a; --muted:#5b6471; --line:#e7e9ee;
@@ -53,6 +62,11 @@
   .stat .n .arrow{color:var(--muted);font-weight:600}
   .stat .n .after{color:var(--ok)}
   .stat .l{color:var(--muted);font-size:14px;margin-top:6px}
+  table.board{border-collapse:collapse;width:100%}
+  table.board td,table.board th{padding:10px 8px;border-bottom:1px solid var(--line);text-align:left;font-size:15px}
+  table.board th{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600}
+  table.board td.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:14px}
+  table.board td.rate{font-weight:700}
   pre{background:var(--code-bg);color:var(--code-ink);border-radius:12px;padding:18px 20px;overflow:auto;
     font:13.5px/1.55 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;margin:0 0 16px}
   pre .c{color:#7d8aa3}
@@ -87,7 +101,7 @@
     <p class="lede">AgentSynth generates synthetic tool-use trajectories, checks them against the
       world's end state, and turns them into RL rewards, benchmarks, and a live leaderboard.</p>
     <div class="cta">
-      <a class="btn primary" href="https://github.com/agentsynth/agentsynth">Star on GitHub</a>
+      <a class="btn primary" href="#start">Get started</a>
       <a class="btn ghost" href="/leaderboard">See the live leaderboard</a>
     </div>
   </div>
@@ -134,9 +148,21 @@
   </div>
 </section>
 
-<section>
+<section id="board" hidden>
   <div class="wrap">
-    <h2>Start in two lines</h2>
+    <h2>Live leaderboard — core_v1</h2>
+    <table class="board">
+      <tr><th>#</th><th>model</th><th>pass rate</th><th>scenarios</th></tr>
+    </table>
+    <p style="color:var(--muted);font-size:14px;margin-top:14px">
+      Ten outcome-checked business tasks over a writable SQL world.
+      <a href="/leaderboard">Full leaderboard →</a></p>
+  </div>
+</section>
+
+<section id="start">
+  <div class="wrap">
+    <h2>Get started</h2>
     <pre><span class="c"># offline mock by default — no API keys needed</span>
 pip install agentsynth-ai</pre>
     <pre><span class="k">from</span> agentsynth <span class="k">import</span> AgentTrajectoryGenerator, TrajectoryEvaluator
@@ -144,9 +170,9 @@ pip install agentsynth-ai</pre>
 gen = AgentTrajectoryGenerator()
 traj = gen.generate(<span class="s">"Refund order 7 in the orders database, then confirm"</span>)
 score = TrajectoryEvaluator().evaluate(traj)</pre>
-    <p style="color:var(--muted);font-size:14px;margin:4px 0 16px">Then run a model through the outcome-checked pack and put it on the board:</p>
-    <pre>agentsynth bench --pack packs/core_v1.yaml --model &lt;your-model&gt; \
-    --submit https://api.agentsynth.tech</pre>
+    <p style="color:var(--muted);font-size:14px;margin:4px 0 16px">Then put a model on the board — the pack downloads itself, nothing to clone
+      (<code style="font-size:13px">--policy mypkg.module:fn</code> benches your own agent loop instead):</p>
+    <pre>agentsynth bench --pack core_v1 --model &lt;your-model&gt; --submit</pre>
   </div>
 </section>
 
@@ -159,9 +185,35 @@ score = TrajectoryEvaluator().evaluate(traj)</pre>
       <a href="https://huggingface.co/datasets/agentsynth/agentsynth-trajectories">Dataset</a>
       <a href="https://huggingface.co/spaces/agentsynth/agentsynth">Live demo</a>
       <a href="/leaderboard">Leaderboard</a>
+      <a href="https://api.agentsynth.tech/docs">API</a>
     </div>
     <div class="fine">MIT licensed · <code>pip install agentsynth-ai</code> · built in the open.</div>
   </div>
 </footer>
+
+<script>
+(function () {
+  fetch('/v1/leaderboard?pack=core_v1')
+    .then(function (r) { return r.ok ? r.json() : null; })
+    .then(function (data) {
+      if (!data || !data.entries || !data.entries.length) return;
+      var table = document.querySelector('#board table');
+      data.entries.slice(0, 5).forEach(function (e) {
+        var tr = document.createElement('tr');
+        [e.rank, e.model, Math.round(e.pass_rate * 100) + '%', e.passed + '/' + e.n]
+          .forEach(function (v, i) {
+            var td = document.createElement('td');
+            td.textContent = v;
+            if (i === 1) td.className = 'mono';
+            if (i === 2) td.className = 'rate';
+            tr.appendChild(td);
+          });
+        table.appendChild(tr);
+      });
+      document.getElementById('board').hidden = false;
+    })
+    .catch(function () {});
+})();
+</script>
 </body>
 </html>

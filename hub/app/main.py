@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import JSON, Column, DateTime, Float, Integer, String, create_engine, func, text
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
@@ -101,10 +101,28 @@ _index_file = Path(__file__).resolve().parent / "index.html"
 if _index_file.exists():
     _INDEX_HTML = _index_file.read_text(encoding="utf-8")
 
+_OG_FILE = Path(__file__).resolve().parent / "og.png"
+
+# Inline SVG so both pages get a tab icon without another asset to serve.
+_FAVICON = (
+    "data:image/svg+xml,"
+    "%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E"
+    "%3Crect width='64' height='64' rx='14' fill='%234f46e5'/%3E"
+    "%3Cpath d='M18 33l10 10 18-22' stroke='%23fff' stroke-width='7' fill='none' "
+    "stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"
+)
+
 
 @app.get("/", response_class=HTMLResponse)
 def home() -> str:
     return _INDEX_HTML or "<h1>AgentSynth</h1><p><a href='/leaderboard'>Leaderboard</a></p>"
+
+
+@app.get("/og.png", include_in_schema=False)
+def og_image() -> FileResponse:
+    if not _OG_FILE.exists():
+        raise HTTPException(status_code=404, detail="no og image")
+    return FileResponse(_OG_FILE, media_type="image/png")
 
 
 @app.get("/healthz")
@@ -200,28 +218,66 @@ def leaderboard_page(pack: str = "core_v1") -> str:
     data = leaderboard(pack=pack)
     rows = (
         "".join(
-            f"<tr><td>{e['rank']}</td><td>{_esc(e['model'])}</td>"
-            f"<td>{e['pass_rate']:.0%}</td><td>{e['passed']}/{e['n']}</td></tr>"
+            f"<tr><td>{e['rank']}</td><td class='m'>{_esc(e['model'])}</td>"
+            f"<td><b>{e['pass_rate']:.0%}</b></td><td>{e['passed']}/{e['n']}</td>"
+            f"<td class='d'>{(e['submitted'] or '')[:10]}</td></tr>"
             for e in data["entries"]
         )
-        or '<tr><td colspan="4">No submissions yet — be the first.</td></tr>'
+        or '<tr><td colspan="5" class="empty">No submissions yet — be the first.</td></tr>'
     )
+    n_scenarios = len(PACKS.get(pack, []))
     cmd = (
         "pip install agentsynth-ai && agentsynth bench "
         f"--pack {pack} --model &lt;model&gt; --submit https://api.agentsynth.tech"
     )
-    return f"""<!doctype html><html><head><meta charset="utf-8">
+    return f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
 <title>AgentSynth — {pack} leaderboard</title>
-<style>body{{font:16px/1.5 system-ui;max-width:720px;margin:3rem auto;padding:0 1rem;color:#1a1a1a}}
+<link rel="icon" href="{_FAVICON}">
+<style>
+:root{{--ink:#11141a;--muted:#5b6471;--line:#e7e9ee;--accent:#4f46e5;--accent-soft:#eef0fe}}
+*{{box-sizing:border-box}}
+body{{margin:0;background:#fff;color:var(--ink);
+font:16px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}}
+a{{color:var(--accent);text-decoration:none}} a:hover{{text-decoration:underline}}
+.wrap{{max-width:760px;margin:0 auto;padding:0 20px}}
+header{{border-bottom:1px solid var(--line)}}
+nav{{display:flex;align-items:center;justify-content:space-between;height:64px}}
+.brand{{font-weight:700;font-size:18px;color:var(--ink)}} .brand b{{color:var(--accent)}}
+nav .links a{{color:var(--ink);margin-left:22px;font-size:15px}}
+nav .links a:hover{{color:var(--accent)}}
+h1{{font-size:30px;letter-spacing:-.02em;margin:40px 0 6px}}
+p.sub{{color:var(--muted);margin:0 0 28px}}
 table{{border-collapse:collapse;width:100%}}
-td,th{{padding:.5rem;border-bottom:1px solid #ddd;text-align:left}}
-code{{background:#f4f4f4;padding:.2rem .4rem;border-radius:4px;font-size:14px}}</style></head>
-<body><h1>{pack} leaderboard</h1>
-<p>Outcome-checked scenarios: a run passes only when the world ends up in the goal state.
-Reproduce any entry — packs are deterministic.</p>
-<table><tr><th>#</th><th>model</th><th>pass rate</th><th>scenarios</th></tr>{rows}</table>
-<p>Submit yours: <code>{cmd}</code></p>
-<p><a href="https://github.com/agentsynth/agentsynth">github.com/agentsynth/agentsynth</a></p>
+td,th{{padding:10px 8px;border-bottom:1px solid var(--line);text-align:left;font-size:15px}}
+th{{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}}
+td.m{{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:14px}}
+td.d{{color:var(--muted);font-size:13.5px}}
+td.empty{{color:var(--muted)}}
+.how{{margin:30px 0 60px;background:var(--accent-soft);border-radius:12px;padding:18px 20px}}
+.how p{{margin:0 0 10px;font-size:14.5px}}
+code{{display:block;background:#0e1117;color:#e6edf3;border-radius:8px;padding:12px 14px;
+font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;overflow-x:auto}}
+@media(max-width:560px){{td.d,th.d{{display:none}}}}
+</style></head>
+<body>
+<header><div class="wrap"><nav>
+<a class="brand" href="/">Agent<b>Synth</b></a>
+<span class="links"><a href="https://github.com/agentsynth/agentsynth">GitHub</a>
+<a href="https://agentsynth.github.io/agentsynth/">Docs</a></span>
+</nav></div></header>
+<div class="wrap">
+<h1>{pack} leaderboard</h1>
+<p class="sub">{n_scenarios} outcome-checked scenarios — a run passes only when the world
+ends up in the goal state. Packs are deterministic; reproduce any entry.</p>
+<table><tr><th>#</th><th>model</th><th>pass rate</th><th>scenarios</th>
+<th class="d">submitted</th></tr>
+{rows}</table>
+<div class="how"><p><b>Get on the board</b> — any LiteLLM model, or your own agent loop via
+<a href="https://github.com/agentsynth/agentsynth#bench-a-model-get-on-the-leaderboard">--policy</a>:</p>
+<code>{cmd}</code></div>
+</div>
 </body></html>"""
 
 

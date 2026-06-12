@@ -58,6 +58,22 @@ def test_submit_and_leaderboard():
     assert "model-a" in page and "80%" in page
 
 
+def test_home_serves_the_landing():
+    page = client.get("/").text
+    assert "Agent training data" in page
+    assert "--pack core_v1" in page  # the quickstart shows the current funnel
+
+
+def test_og_image_and_leaderboard_chrome():
+    img = client.get("/og.png")
+    assert img.status_code == 200
+    assert img.headers["content-type"] == "image/png"
+
+    page = client.get("/leaderboard").text
+    assert "background:#fff" in page  # dark-mode browsers must not bleed through
+    assert 'name="viewport"' in page
+
+
 def test_submission_validation():
     bad_pack = client.post(
         "/v1/submissions", json={"pack_id": "nope", "model": "m", "report": _report()}
