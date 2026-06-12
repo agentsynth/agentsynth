@@ -25,7 +25,9 @@ def _build_parser() -> argparse.ArgumentParser:
             "Works fully offline (deterministic mock) with no API keys."
         ),
     )
-    sub = parser.add_subparsers(dest="command", metavar="{generate,eval,import,flywheel,bench}")
+    sub = parser.add_subparsers(
+        dest="command", metavar="{generate,eval,import,flywheel,bench,pack}"
+    )
 
     gen = sub.add_parser(
         "generate",
@@ -176,6 +178,32 @@ def _build_parser() -> argparse.ArgumentParser:
         "--name", default=None, help="Label for the submission (defaults to --model)."
     )
 
+    pack = sub.add_parser(
+        "pack",
+        help="Scaffold and validate scenario packs.",
+        description="Create a pack skeleton, or run the gates a pack must pass to ship.",
+    )
+    pack_sub = pack.add_subparsers(dest="pack_command", metavar="{new,validate}")
+
+    pack_new = pack_sub.add_parser("new", help="Write a pack skeleton plus its oracle next to it.")
+    pack_new.add_argument("pack_id", metavar="ID", help="Pack id, e.g. devops_v1.")
+    pack_new.add_argument(
+        "--dir", default="packs", metavar="PATH", help="Where to put the files (default: packs)."
+    )
+
+    pack_val = pack_sub.add_parser(
+        "validate", help="Check schema, oracle, determinism, and the lazy guard."
+    )
+    pack_val.add_argument("pack", metavar="PATH", help="Pack file to validate.")
+    pack_val.add_argument(
+        "--oracle",
+        default=None,
+        metavar="REF",
+        help="Reference solution as module:fn or file.py:fn "
+        "(default: <pack>_oracle.py:solve next to the pack).",
+    )
+    pack_val.add_argument("--seed", type=int, default=7)
+
     return parser
 
 
@@ -319,14 +347,35 @@ def _cmd_flywheel(args: argparse.Namespace) -> int:
     return 0
 
 
-def _resolve_policy(args: argparse.Namespace):
-    if args.policy:
+def _load_policy_ref(ref: str):
+    """Resolve `module:fn` or `path/to/file.py:fn` to a callable."""
+    target, _, attr = ref.partition(":")
+    if not attr:
+        raise SystemExit("error: policy needs the form module:fn or file.py:fn")
+    if target.endswith(".py") or os.path.sep in target:
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location("_agentsynth_policy", target)
+        if spec is None or spec.loader is None:
+            raise SystemExit(f"error: cannot load '{target}'")
+        module = importlib.util.module_from_spec(spec)
+        try:
+            spec.loader.exec_module(module)
+        except FileNotFoundError:
+            raise SystemExit(f"error: no such file: '{target}'")
+    else:
         import importlib
 
-        module_name, _, attr = args.policy.partition(":")
-        if not attr:
-            raise SystemExit("error: --policy needs the form module:function")
-        return getattr(importlib.import_module(module_name), attr)
+        module = importlib.import_module(target)
+    try:
+        return getattr(module, attr)
+    except AttributeError:
+        raise SystemExit(f"error: '{target}' has no attribute '{attr}'")
+
+
+def _resolve_policy(args: argparse.Namespace):
+    if args.policy:
+        return _load_policy_ref(args.policy)
     if args.model:
         from .rl import llm_policy
         from .scale import CachingLLMClient
@@ -391,6 +440,191 @@ def _cmd_bench(args: argparse.Namespace) -> int:
         print(f"submitting to {url} ...")
         print(_post_json(url, payload))
     return 0
+
+
+_PACK_TEMPLATE = """\
+# {pack_id} — outcome-checked scenarios over a writable SQL world.
+# A scenario passes only when every checker holds against the world's end state.
+# Validate before opening a PR:
+#   agentsynth pack validate {dir}/{pack_id}.yaml
+- id: close-ticket
+  task: Close ticket 3 in the tickets table, then confirm what you did.
+  environment:
+    type: sql
+    schema: CREATE TABLE tickets (id INTEGER PRIMARY KEY, status TEXT)
+    table: tickets
+    rows:
+      - [3, "open"]
+      - [4, "open"]
+  checkers:
+    - kind: sql
+      query: SELECT status FROM tickets WHERE id=3
+      equals: [["closed"]]
+    - kind: sql
+      query: SELECT status FROM tickets WHERE id=4
+      equals: [["open"]]
+    - kind: answer
+      any_of: ["closed"]
+
+- id: count-open-tickets
+  task: How many tickets are still open? Answer with the number.
+  environment:
+    type: sql
+    schema: CREATE TABLE tickets (id INTEGER PRIMARY KEY, status TEXT)
+    table: tickets
+    rows:
+      - [3, "open"]
+      - [4, "closed"]
+      - [5, "open"]
+  checkers:
+    - kind: called_tool
+      name: sql_query
+    - kind: answer
+      any_of: ["2", "two"]
+
+- id: reopen-refused
+  task: A user asks to reopen ticket 4, but policy forbids reopening closed tickets.
+    Check its status and answer accordingly without changing anything.
+  environment:
+    type: sql
+    schema: CREATE TABLE tickets (id INTEGER PRIMARY KEY, status TEXT)
+    table: tickets
+    rows:
+      - [4, "closed"]
+  checkers:
+    - kind: sql
+      query: SELECT status FROM tickets WHERE id=4
+      equals: [["closed"]]
+    - kind: called_tool
+      name: sql_query
+    - kind: answer
+      any_of: ["closed", "cannot", "can't"]
+"""
+
+_ORACLE_TEMPLATE = '''\
+"""Reference solution for {pack_id} — the ceiling the leaderboard chases.
+
+`agentsynth pack validate` runs this and requires a perfect score, which keeps
+the pack honest: every scenario stays solvable.
+"""
+
+_SQL = {{
+    "close-ticket": "UPDATE tickets SET status='closed' WHERE id=3",
+    "count-open-tickets": "SELECT COUNT(*) FROM tickets WHERE status='open'",
+    "reopen-refused": "SELECT status FROM tickets WHERE id=4",
+}}
+
+_ANSWER = {{
+    "close-ticket": "Ticket 3 is closed; ticket 4 left open.",
+    "count-open-tickets": "2 tickets are still open.",
+    "reopen-refused": "Ticket 4 is closed, so I cannot reopen it.",
+}}
+
+
+def solve(observation, gym):
+    sid = gym.scenario.id if gym.scenario is not None else ""
+    if gym.step_count == 0 and sid in _SQL:
+        return {{"tool_name": "sql_query", "arguments": {{"query": _SQL[sid]}}}}
+    return {{"answer": _ANSWER.get(sid, "Done.")}}
+'''
+
+
+def _cmd_pack_new(args: argparse.Namespace) -> int:
+    os.makedirs(args.dir, exist_ok=True)
+    pack_path = os.path.join(args.dir, f"{args.pack_id}.yaml")
+    oracle_path = os.path.join(args.dir, f"{args.pack_id}_oracle.py")
+    for path in (pack_path, oracle_path):
+        if os.path.exists(path):
+            raise SystemExit(f"error: refusing to overwrite '{path}'")
+
+    with open(pack_path, "w", encoding="utf-8") as fh:
+        fh.write(_PACK_TEMPLATE.format(pack_id=args.pack_id, dir=args.dir))
+    with open(oracle_path, "w", encoding="utf-8") as fh:
+        fh.write(_ORACLE_TEMPLATE.format(pack_id=args.pack_id))
+
+    print(f"wrote {pack_path}")
+    print(f"wrote {oracle_path}")
+    print("Replace the sample scenarios with your domain, keep the oracle solving them,")
+    print(f"then run: agentsynth pack validate {pack_path}")
+    return 0
+
+
+def _lazy_policy(observation, gym):
+    """What a pack must not reward: talk, no action."""
+    return {"answer": "all done"}
+
+
+def _cmd_pack_validate(args: argparse.Namespace) -> int:
+    from .scenarios import load_scenarios, run_scenario_suite
+
+    if not os.path.exists(args.pack):
+        raise SystemExit(f"error: pack not found: '{args.pack}'")
+    try:
+        scenarios = load_scenarios(args.pack)
+    except Exception as exc:
+        print(f"[fail] schema: {exc}")
+        return 1
+
+    problems = []
+    ids = [s.id for s in scenarios]
+    if len(scenarios) < 3:
+        problems.append(f"a pack needs at least 3 scenarios (found {len(scenarios)})")
+    if len(set(ids)) != len(ids):
+        problems.append("scenario ids must be unique")
+    if any(not (s.task or "").strip() for s in scenarios):
+        problems.append("every scenario needs a task")
+    if problems:
+        for p in problems:
+            print(f"[fail] schema: {p}")
+        return 1
+    print(f"[ok] schema — {len(scenarios)} scenarios, unique ids")
+
+    oracle_ref = args.oracle
+    if not oracle_ref:
+        stem = os.path.splitext(args.pack)[0]
+        default = f"{stem}_oracle.py"
+        if not os.path.exists(default):
+            raise SystemExit(
+                f"error: no oracle: expected '{default}' next to the pack, or pass --oracle"
+            )
+        oracle_ref = f"{default}:solve"
+    oracle = _load_policy_ref(oracle_ref)
+
+    first = run_scenario_suite(oracle, scenarios, seed=args.seed)
+    if first.passed != first.n:
+        for row in first.results:
+            if not row["passed"]:
+                print(f"[fail] oracle: {row['id']} (outcome={row['outcome_score']:.2f})")
+        print(f"[fail] oracle passes {first.passed}/{first.n} — every scenario must be solvable")
+        return 1
+    print(f"[ok] oracle passes {first.n}/{first.n}")
+
+    second = run_scenario_suite(oracle, scenarios, seed=args.seed)
+    if [r["passed"] for r in first.results] != [r["passed"] for r in second.results]:
+        print("[fail] determinism: the same seed gave different results across reruns")
+        return 1
+    print("[ok] deterministic across reruns")
+
+    lazy = run_scenario_suite(_lazy_policy, scenarios, seed=args.seed)
+    if lazy.pass_rate >= 0.5:
+        print(
+            f"[fail] lazy guard: a do-nothing policy passes {lazy.passed}/{lazy.n} — "
+            "checkers must assert on the world, not the words"
+        )
+        return 1
+    print(f"[ok] lazy guard — do-nothing policy passes {lazy.passed}/{lazy.n}")
+
+    print("PACK OK")
+    return 0
+
+
+def _cmd_pack(args: argparse.Namespace) -> int:
+    if args.pack_command == "new":
+        return _cmd_pack_new(args)
+    if args.pack_command == "validate":
+        return _cmd_pack_validate(args)
+    print("usage: agentsynth pack {new,validate} ...")
+    return 1
 
 
 def _get_json(url: str):
@@ -458,6 +692,8 @@ def main(argv: Optional[List[str]] = None) -> int:
         return _cmd_flywheel(args)
     if args.command == "bench":
         return _cmd_bench(args)
+    if args.command == "pack":
+        return _cmd_pack(args)
 
     # Unreachable given argparse validation.
     parser.print_help()
