@@ -77,3 +77,17 @@ def test_render_detail_with_and_without_eval(batch):
     judged = app.render_trajectory_detail(trajs[0], results)
     assert "Judge" in judged
     assert app.render_trajectory_detail(None).startswith("_")
+
+
+def test_agent_run_renders_outcome_and_timeline():
+    out = app.do_agent_run("refund-order", "expert (inspect-act-verify)", "mock (offline)")
+    assert "Outcome checks" in out and "PASS" in out
+    assert 'class="traj"' in out  # the episode timeline renders below the card
+
+    lazy = app.do_agent_run("refund-order", "lazy (just talks)", "mock (offline)")
+    assert "FAIL" in lazy and "✗" in lazy
+
+
+def test_agent_run_guards_the_llm_policy():
+    out = app.do_agent_run("refund-order", app._LLM_POLICY_LABEL, "mock (offline)")
+    assert "needs a model id" in out

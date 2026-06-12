@@ -23,6 +23,7 @@ from agentsynth import (
     save_dataset,
 )
 from agentsynth import metrics as M
+from agentsynth.demo import DEMO_POLICIES, demo_scenarios, llm_policy_for
 from agentsynth.schemas import RUBRIC_DIMENSIONS
 from agentsynth.utils import (
     detect_default_model,
@@ -187,6 +188,74 @@ def filter_overview_rows(
                 continue
         rows.append(_overview_row(idx, traj, by_id))
     return rows
+
+
+_DEMO_SCENARIOS = {s.id: s for s in demo_scenarios()}
+_LLM_POLICY_LABEL = "LLM (pick a model →)"
+
+
+def _outcome_card(outcome: Dict[str, Any], total_reward: float) -> str:
+    """The world-state checks that decided the episode — the part that can't be talked past."""
+    score = float(outcome.get("score", 0.0))
+    ok = score >= 1.0
+    badge = '<span class="badge pass">PASS</span>' if ok else '<span class="badge fail">FAIL</span>'
+    rows = []
+    for check in outcome.get("checks", []):
+        mark = "ok" if check.get("passed") else "fail"
+        label = "✓" if check.get("passed") else "✗"
+        rows.append(
+            f'<div class="ocheck"><span class="omark {mark}">{label}</span>'
+            f'<span class="oname">{_esc(check.get("name", "?"))}</span>'
+            f'<span class="odetail">{_esc(_truncate(check.get("detail", ""), 110))}</span></div>'
+        )
+    return (
+        '<div class="verdict">'
+        f'<div class="vhead">Outcome checks <b>{score:.2f}</b> {badge}'
+        f'<span class="vnum" style="flex:none;margin-left:auto">reward {total_reward:.3f}</span>'
+        f"</div>{''.join(rows)}</div>"
+    )
+
+
+def do_agent_run(scenario_id: str, policy_name: str, model_choice: str) -> str:
+    """One real episode: the chosen policy works the world, the checkers judge it."""
+    scenario = _DEMO_SCENARIOS.get(scenario_id)
+    if scenario is None:
+        return "_Pick a scenario first._"
+
+    if policy_name == _LLM_POLICY_LABEL:
+        model = _model_arg(model_choice)
+        if not model:
+            gr.Warning("Pick or type a real model id for the LLM policy.")
+            return (
+                "_The LLM policy needs a model id — choose one in the model dropdown "
+                "(and set its provider key), or run one of the scripted policies._"
+            )
+        policy = llm_policy_for(model)
+        if policy is None:
+            gr.Warning(f"Model '{model}' isn't usable here (missing key?).")
+            return (
+                f"_Could not reach `{model}` — check the provider key, or run a scripted policy._"
+            )
+    else:
+        policy = DEMO_POLICIES.get(policy_name)
+        if policy is None:
+            return "_Unknown policy._"
+
+    from agentsynth.rl import AgentGym
+
+    gym = AgentGym.from_scenario(scenario, seed=7)
+    try:
+        episode = gym.rollout(policy)
+    finally:
+        gym.close()
+
+    outcome = episode.info.get("outcome", {})
+    return _outcome_card(outcome, episode.total_reward) + render_tree(episode.trajectory)
+
+
+def do_agent_task(scenario_id: str) -> str:
+    scenario = _DEMO_SCENARIOS.get(scenario_id)
+    return f"**Task:** {scenario.task}" if scenario else ""
 
 
 def _verdict_card(ev: Any) -> str:
@@ -766,6 +835,14 @@ footer{display:none !important}
 .vwhy{margin-top:10px;font-size:13px;color:#5b6471}
 @media(max-width:760px){.vdims{grid-template-columns:1fr}.vname{flex-basis:120px}}
 
+.ocheck{display:flex;align-items:flex-start;gap:10px;padding:6px 0;font-size:13.5px}
+.omark{flex:0 0 20px;text-align:center;font-weight:800;border-radius:5px}
+.omark.ok{color:#0f9d58}
+.omark.fail{color:#dc2626}
+.oname{flex:0 0 150px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  font-size:12.5px;color:#11141a}
+.odetail{flex:1;color:#5b6471}
+
 /* dark theme: the cards go dark too instead of floating as white islands.
    One selector per rule — gradio's css scoper mangles comma lists under .dark. */
 .dark .traj{background:#14161c;border-color:#272b36}
@@ -797,6 +874,8 @@ footer{display:none !important}
 .dark .kpi{background:#14161c;border-color:#272b36}
 .dark .kpi-v{color:#e6e9f0}
 .dark .kpi-l{color:#9aa3b2}
+.dark .oname{color:#e6e9f0}
+.dark .odetail{color:#9aa3b2}
 """
 
 _THEME = gr.themes.Soft(
@@ -953,6 +1032,42 @@ with gr.Blocks(title="AgentSynth — playground", **_BLOCKS_KW) as demo:
             do_filter_overview,
             inputs=[traj_state, eval_state, ov_mode, ov_min_score],
             outputs=[gen_overview],
+        )
+
+    with gr.Tab("Agent runs"):
+        gr.Markdown(
+            "Watch a policy work an outcome-checked world. The scripted agents run "
+            "offline; pick the LLM policy plus a model id to watch a real model try."
+        )
+        with gr.Row():
+            agent_scenario = gr.Dropdown(
+                choices=sorted(_DEMO_SCENARIOS),
+                value=next(iter(sorted(_DEMO_SCENARIOS)), None),
+                label="Scenario (core_v1)",
+                scale=2,
+            )
+            agent_policy = gr.Dropdown(
+                choices=list(DEMO_POLICIES) + [_LLM_POLICY_LABEL],
+                value=next(iter(DEMO_POLICIES)),
+                label="Policy",
+                scale=2,
+            )
+            agent_model = gr.Dropdown(
+                choices=_MODEL_CHOICES,
+                value=MOCK_LABEL,
+                label="Model (LLM policy only)",
+                allow_custom_value=True,
+                scale=2,
+            )
+        agent_task = gr.Markdown(do_agent_task(next(iter(sorted(_DEMO_SCENARIOS)), "")))
+        agent_btn = gr.Button("Run the episode", variant="primary", elem_id="agent-btn")
+        agent_view = gr.Markdown("_Pick a scenario and policy, then run the episode._")
+
+        agent_scenario.change(do_agent_task, inputs=[agent_scenario], outputs=[agent_task])
+        agent_btn.click(
+            do_agent_run,
+            inputs=[agent_scenario, agent_policy, agent_model],
+            outputs=[agent_view],
         )
 
     with gr.Tab("Evaluate"):
