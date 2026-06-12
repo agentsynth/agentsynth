@@ -504,9 +504,40 @@ agentsynth bench --pack core_v1 --model claude-haiku-4-5-20251001 --submit
 `--submit` without a value posts to the default hub (override with `--hub`).
 `--trials 4` runs the pack four times and scores **pass^k** — a scenario counts
 only when every trial passes, the reliability number single-shot benchmarks hide.
+`--compare "gpt-4o-mini,my_agent.py:solve"` runs models and your own loops side
+by side in one table.
 [`examples/core_v1_oracle.py`](examples/core_v1_oracle.py) is the reference
 solution — it inspects, acts, then verifies, and `agentsynth pack teach` exports
 its episodes as gold trajectories for SFT seeding.
+
+### Bring your own agent loop
+
+If your agent already speaks OpenAI function calling (the OpenAI SDK, LangGraph,
+CrewAI), don't rewrite it as a policy — drive the world directly:
+
+```python
+from agentsynth import AgentGym, to_openai_tools, action_from_openai_tool_call
+from agentsynth.scenarios import load_scenarios
+
+scenario = load_scenarios("packs/core_v1.yaml")[0]
+gym = AgentGym.from_scenario(scenario, seed=7)
+task = gym.reset()
+tools = to_openai_tools(gym)               # OpenAI function-calling schemas
+
+messages = [{"role": "user", "content": task}]
+while True:
+    msg = client.chat.completions.create(model=..., messages=messages, tools=tools).choices[0].message
+    if not msg.tool_calls:
+        result = gym.step({"answer": msg.content})
+        break
+    for call in msg.tool_calls:
+        out = gym.step(action_from_openai_tool_call(call))
+        messages.append({"role": "tool", "tool_call_id": call.id, "content": out.observation})
+
+print(result.info["outcome"])               # the world-state verdict
+```
+
+The final step's `info["outcome"]` is the same verdict the leaderboard scores.
 
 Packs are community-extensible — scaffold one for your domain and it gets its
 own live leaderboard once merged:

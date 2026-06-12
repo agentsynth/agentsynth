@@ -164,6 +164,13 @@ def _build_parser() -> argparse.ArgumentParser:
         metavar="MODULE:FUNC",
         help="A custom policy instead of --model, e.g. mypkg.policies:my_policy.",
     )
+    bench.add_argument(
+        "--compare",
+        default=None,
+        metavar="ITEMS",
+        help="Comma-separated model ids and/or policy refs to run side by side, "
+        "e.g. gpt-4o-mini,my_agent.py:solve.",
+    )
     bench.add_argument("--seed", type=int, default=7)
     bench.add_argument(
         "--trials",
@@ -406,21 +413,25 @@ def _load_policy_ref(ref: str):
         raise SystemExit(f"error: '{target}' has no attribute '{attr}'")
 
 
+def _policy_from_model(model: str):
+    from .rl import llm_policy
+    from .scale import CachingLLMClient
+
+    client = CachingLLMClient(model=model)
+    if not client.available:
+        raise SystemExit(
+            f"error: model '{model}' is not usable ({client.last_error}); "
+            "set the provider key, or use a policy ref"
+        )
+    return llm_policy(client)
+
+
 def _resolve_policy(args: argparse.Namespace):
     if args.policy:
         return _load_policy_ref(args.policy)
     if args.model:
-        from .rl import llm_policy
-        from .scale import CachingLLMClient
-
-        client = CachingLLMClient(model=args.model)
-        if not client.available:
-            raise SystemExit(
-                f"error: model '{args.model}' is not usable ({client.last_error}); "
-                "set the provider key, or use --policy"
-            )
-        return llm_policy(client)
-    raise SystemExit("error: pass --model <litellm id> or --policy module:function")
+        return _policy_from_model(args.model)
+    raise SystemExit("error: pass --model <litellm id>, --policy module:function, or --compare a,b")
 
 
 def _load_pack(pack: str, hub: str):
@@ -452,10 +463,105 @@ def _failed_checks(row: Dict) -> str:
     return f"  failed: {', '.join(names)}" if names else ""
 
 
+def _run_trials(policy, scenarios, seed: int, trials: int):
+    """Aggregate K trials into one pass^K report. Returns (report, pass1_avg)."""
+    from .scenarios import ScenarioReport, run_scenario_suite
+
+    reports = [run_scenario_suite(policy, scenarios, seed=seed + t) for t in range(trials)]
+    if trials == 1:
+        return reports[0], None
+    order = [row["id"] for row in reports[0].results]
+    wins: Dict[str, int] = {sid: 0 for sid in order}
+    scores: Dict[str, float] = {sid: 1.0 for sid in order}
+    for rep in reports:
+        for row in rep.results:
+            wins[row["id"]] += 1 if row["passed"] else 0
+            scores[row["id"]] = min(scores[row["id"]], float(row["outcome_score"]))
+    agg = [
+        {"id": sid, "passed": wins[sid] == trials, "outcome_score": scores[sid]} for sid in order
+    ]
+    passed = sum(1 for row in agg if row["passed"])
+    report = ScenarioReport(
+        n=len(agg), passed=passed, pass_rate=round(passed / (len(agg) or 1), 4), results=agg
+    )
+    pass1_avg = round(sum(rep.pass_rate for rep in reports) / len(reports), 4)
+    return report, pass1_avg
+
+
+def _cmd_bench_compare(args: argparse.Namespace, scenarios, pack_id: str) -> int:
+    items = [item.strip() for item in args.compare.split(",") if item.strip()]
+    if len(items) < 2:
+        raise SystemExit("error: --compare needs at least two comma-separated items")
+
+    trials = max(1, int(args.trials))
+    runs = []
+    for item in items:
+        policy = _load_policy_ref(item) if ":" in item else _policy_from_model(item)
+        report, pass1_avg = _run_trials(policy, scenarios, args.seed, trials)
+        runs.append({"name": item, "pass1_avg": pass1_avg, "report": report})
+
+    def disp(name: str) -> str:
+        return name if len(name) <= 22 else "…" + name[-21:]
+
+    id_width = max(len(r["id"]) for r in runs[0]["report"].results)
+    header = "scenario".ljust(id_width) + "".join(f"  {disp(run['name']):>22}" for run in runs)
+    print(header)
+    by_name = {
+        run["name"]: {row["id"]: row["passed"] for row in run["report"].results} for run in runs
+    }
+    for row in runs[0]["report"].results:
+        sid = row["id"]
+        cells = "".join(f"  {'✓' if by_name[run['name']][sid] else '✗':>22}" for run in runs)
+        print(sid.ljust(id_width) + cells)
+    label = f"pass^{trials}" if trials > 1 else "pass rate"
+    print(label.ljust(id_width) + "".join(f"  {run['report'].pass_rate:>22.0%}" for run in runs))
+    if trials > 1:
+        print(
+            "pass^1 avg".ljust(id_width) + "".join(f"  {run['pass1_avg']:>22.0%}" for run in runs)
+        )
+
+    if args.json_out:
+        import json
+
+        blob = {
+            "pack_id": pack_id,
+            "seed": args.seed,
+            "trials": trials,
+            "compare": [
+                {"name": run["name"], "pass1_avg": run["pass1_avg"], **run["report"].model_dump()}
+                for run in runs
+            ],
+        }
+        with open(args.json_out, "w", encoding="utf-8") as fh:
+            json.dump(blob, fh, indent=2)
+        print(f"report -> {args.json_out}")
+
+    if args.submit is not None:
+        from . import __version__
+
+        url = (args.submit or args.hub).rstrip("/") + "/v1/submissions"
+        for run in runs:
+            payload = {
+                "pack_id": pack_id,
+                "model": run["name"][:200],
+                "report": run["report"].model_dump(),
+                "client_version": __version__,
+            }
+            print(f"submitting {run['name']} to {url} ...")
+            print(_post_json(url, payload))
+    return 0
+
+
 def _cmd_bench(args: argparse.Namespace) -> int:
     from .scenarios import ScenarioReport, run_scenario_suite
 
     scenarios, pack_id = _load_pack(args.pack, args.hub)
+
+    if args.compare:
+        if args.model or args.policy:
+            raise SystemExit("error: --compare replaces --model/--policy")
+        return _cmd_bench_compare(args, scenarios, pack_id)
+
     policy = _resolve_policy(args)
 
     trials = max(1, int(args.trials))

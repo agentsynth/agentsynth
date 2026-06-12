@@ -110,6 +110,75 @@ def test_bench_json_report(scaffold, tmp_path, capsys):
     assert report["pack_id"] == "demo_v1"
 
 
+def test_compare_runs_items_side_by_side(scaffold, tmp_path, capsys):
+    pack, oracle = scaffold
+    out = tmp_path / "cmp.json"
+    code = cli_main(
+        [
+            "bench",
+            "--pack",
+            str(pack),
+            "--compare",
+            f"{oracle}:solve,tests.bench_policy:lazy",
+            "--trials",
+            "2",
+            "--json",
+            str(out),
+        ]
+    )
+    stdout = capsys.readouterr().out
+    assert code == 0
+    assert "✓" in stdout and "✗" in stdout
+    assert "pass^2" in stdout and "100%" in stdout and "0%" in stdout
+
+    blob = json.loads(out.read_text())
+    assert [run["pass_rate"] for run in blob["compare"]] == [1.0, 0.0]
+    assert blob["compare"][1]["name"] == "tests.bench_policy:lazy"
+
+
+def test_compare_submits_each_item_under_its_name(scaffold, monkeypatch):
+    from agentsynth import cli as climod
+
+    pack, oracle = scaffold
+    posted = []
+    monkeypatch.setattr(
+        climod, "_post_json", lambda url, payload: posted.append(payload) or '{"id": 1}'
+    )
+    code = cli_main(
+        [
+            "bench",
+            "--pack",
+            str(pack),
+            "--compare",
+            f"{oracle}:solve,tests.bench_policy:lazy",
+            "--submit",
+            "--hub",
+            "https://hub.example",
+        ]
+    )
+    assert code == 0
+    assert [p["model"] for p in posted] == [f"{oracle}:solve", "tests.bench_policy:lazy"]
+    assert posted[0]["report"]["pass_rate"] == 1.0
+
+
+def test_compare_guards(scaffold):
+    pack, oracle = scaffold
+    with pytest.raises(SystemExit):
+        cli_main(["bench", "--pack", str(pack), "--compare", f"{oracle}:solve"])
+    with pytest.raises(SystemExit):
+        cli_main(
+            [
+                "bench",
+                "--pack",
+                str(pack),
+                "--compare",
+                f"{oracle}:solve,tests.bench_policy:lazy",
+                "--policy",
+                "tests.bench_policy:lazy",
+            ]
+        )
+
+
 def test_pack_teach_rejects_an_imperfect_oracle(scaffold, tmp_path, capsys):
     pack, oracle = scaffold
     oracle.write_text(
