@@ -494,6 +494,9 @@ def _cmd_bench(args: argparse.Namespace) -> int:
         print(f"\npass^1 (avg of {trials} trials): {avg:.0%}")
         print(f"pass^{trials} (all trials must pass): {passed}/{len(agg)} ({report.pass_rate:.0%})")
 
+    if args.submit is None and report.passed > 0:
+        print("→ add --submit to put this run on the live leaderboard (agentsynth.tech)")
+
     if args.json_out:
         import json
 
@@ -714,6 +717,10 @@ def _cmd_pack_validate(args: argparse.Namespace) -> int:
     print(f"[ok] lazy guard — do-nothing policy passes {lazy.passed}/{lazy.n}")
 
     print("PACK OK")
+    print(
+        "→ packs this clean belong in the public registry: open a PR adding it to "
+        "packs/ (see packs/README.md) and it gets its own live leaderboard"
+    )
     return 0
 
 

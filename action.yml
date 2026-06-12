@@ -28,6 +28,12 @@ inputs:
   version:
     description: Version spec appended to the install, e.g. ==0.7.0 or >=0.6.2.
     default: ""
+  submit:
+    description: Also post the run to the public leaderboard ("true"/"false").
+    default: "false"
+  name:
+    description: Leaderboard label when submitting (defaults to the repo name).
+    default: ""
 
 runs:
   using: composite
@@ -43,6 +49,11 @@ runs:
         args=(bench --pack "${{ inputs.pack }}" --trials "${{ inputs.trials }}" --json agentsynth_report.json)
         if [ -n "${{ inputs.policy }}" ]; then args+=(--policy "${{ inputs.policy }}"); fi
         if [ -n "${{ inputs.model }}" ]; then args+=(--model "${{ inputs.model }}"); fi
+        if [ "${{ inputs.submit }}" = "true" ]; then
+          name="${{ inputs.name }}"
+          if [ -z "$name" ]; then name="${GITHUB_REPOSITORY#*/}"; fi
+          args+=(--submit --name "$name")
+        fi
         python -m agentsynth.cli "${args[@]}"
 
     - name: gate
