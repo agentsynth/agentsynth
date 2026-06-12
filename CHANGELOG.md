@@ -6,6 +6,37 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-06-12
+
+### Added
+
+- Pack tooling: `agentsynth pack new` scaffolds a working pack plus its oracle,
+  `pack validate` is the merge gate (schema, the oracle solves everything, two
+  runs agree, a do-nothing policy stays under half), and `pack teach` exports
+  the oracle's episodes as verified gold trajectories for SFT seeding. Policies
+  load from file paths (`oracle.py:fn`) as well as modules.
+- Reliability scoring: `bench --trials K` runs a pack on K seeds and reports
+  pass^K — a scenario counts only when every trial passes — with FLAKY called
+  out per scenario; submissions send the reliability-adjusted numbers. FAIL
+  lines now name the checkers that failed, and `--json` writes the full report
+  for CI gates and analysis.
+- The repo doubles as a GitHub Action: bench a pack in CI and fail the job when
+  the pass rate drops under `min-pass-rate`.
+- `agentsynth.demo`: the core_v1 expert (inspect, act, verify), the read-only
+  baseline, and the lazy talker as importable policies, plus the demo pack with
+  a local → hub → built-in fallback. The playground's new Agent runs tab plays
+  them through real episodes.
+- Trace donation: `redact_text` / `redact_trajectory` strip emails, API keys,
+  bearer tokens, and phone-shaped numbers; `agentsynth import --redact` applies
+  them before export. Plain numbers and dates survive.
+- `scripts/hard_set.py` builds a training set from whatever the hub's breakdown
+  says models fail most.
+
+### Changed
+
+- The core_v1 oracle works like a careful operator now — inspect the rows, make
+  the change, read it back — which makes its episodes worth imitating.
+
 ## [0.6.2] - 2026-06-12
 
 ### Added
