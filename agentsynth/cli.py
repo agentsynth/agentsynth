@@ -166,6 +166,14 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     bench.add_argument("--seed", type=int, default=7)
     bench.add_argument(
+        "--trials",
+        type=int,
+        default=1,
+        metavar="K",
+        help="Run the pack K times (seeds seed..seed+K-1) and score pass^K: a "
+        "scenario counts only when every trial passes (default: 1).",
+    )
+    bench.add_argument(
         "--hub",
         default="https://api.agentsynth.tech",
         metavar="URL",
@@ -188,7 +196,7 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Scaffold and validate scenario packs.",
         description="Create a pack skeleton, or run the gates a pack must pass to ship.",
     )
-    pack_sub = pack.add_subparsers(dest="pack_command", metavar="{new,validate}")
+    pack_sub = pack.add_subparsers(dest="pack_command", metavar="{new,validate,teach}")
 
     pack_new = pack_sub.add_parser("new", help="Write a pack skeleton plus its oracle next to it.")
     pack_new.add_argument("pack_id", metavar="ID", help="Pack id, e.g. devops_v1.")
@@ -208,6 +216,16 @@ def _build_parser() -> argparse.ArgumentParser:
         "(default: <pack>_oracle.py:solve next to the pack).",
     )
     pack_val.add_argument("--seed", type=int, default=7)
+
+    pack_teach = pack_sub.add_parser(
+        "teach", help="Run the oracle through the pack and export gold trajectories."
+    )
+    pack_teach.add_argument("pack", metavar="PATH", help="Pack file to teach from.")
+    pack_teach.add_argument(
+        "--oracle", default=None, metavar="REF", help="Same form and default as validate."
+    )
+    pack_teach.add_argument("--out", default="gold.jsonl", metavar="PATH")
+    pack_teach.add_argument("--seed", type=int, default=7)
 
     return parser
 
@@ -422,22 +440,57 @@ def _load_pack(pack: str, hub: str):
     return [Scenario(**item) for item in payload], pack_id
 
 
+def _failed_checks(row: Dict) -> str:
+    names = [c.get("name", "?") for c in row.get("checks", []) if not c.get("passed")]
+    return f"  failed: {', '.join(names)}" if names else ""
+
+
 def _cmd_bench(args: argparse.Namespace) -> int:
-    from .scenarios import run_scenario_suite
+    from .scenarios import ScenarioReport, run_scenario_suite
 
     scenarios, pack_id = _load_pack(args.pack, args.hub)
     policy = _resolve_policy(args)
 
-    report = run_scenario_suite(policy, scenarios, seed=args.seed)
-    for row in report.results:
-        mark = "pass" if row["passed"] else "FAIL"
-        print(f"[{mark}] {row['id']}  outcome={row['outcome_score']:.2f}")
-    print(f"\n{report.passed}/{report.n} scenarios passed (pass_rate={report.pass_rate})")
+    trials = max(1, int(args.trials))
+    reports = [run_scenario_suite(policy, scenarios, seed=args.seed + t) for t in range(trials)]
+
+    if trials == 1:
+        report = reports[0]
+        for row in report.results:
+            mark = "pass" if row["passed"] else "FAIL"
+            print(f"[{mark}] {row['id']}  outcome={row['outcome_score']:.2f}{_failed_checks(row)}")
+        print(f"\n{report.passed}/{report.n} scenarios passed (pass_rate={report.pass_rate})")
+    else:
+        # pass^k after tau-bench: reliability means passing every one of k trials.
+        order = [row["id"] for row in reports[0].results]
+        wins: Dict[str, List[bool]] = {sid: [] for sid in order}
+        scores: Dict[str, float] = {sid: 1.0 for sid in order}
+        for rep in reports:
+            for row in rep.results:
+                wins[row["id"]].append(bool(row["passed"]))
+                scores[row["id"]] = min(scores[row["id"]], float(row["outcome_score"]))
+        agg = []
+        for sid in order:
+            k_pass = sum(wins[sid])
+            all_pass = k_pass == trials
+            mark = "pass" if all_pass else ("FLAKY" if k_pass else "FAIL")
+            print(f"[{mark}] {sid}  {k_pass}/{trials} trials  worst_outcome={scores[sid]:.2f}")
+            agg.append({"id": sid, "passed": all_pass, "outcome_score": scores[sid]})
+        passed = sum(1 for row in agg if row["passed"])
+        n = len(agg) or 1
+        avg = sum(rep.pass_rate for rep in reports) / len(reports)
+        report = ScenarioReport(
+            n=len(agg), passed=passed, pass_rate=round(passed / n, 4), results=agg
+        )
+        print(f"\npass^1 (avg of {trials} trials): {avg:.0%}")
+        print(f"pass^{trials} (all trials must pass): {passed}/{len(agg)} ({report.pass_rate:.0%})")
 
     if args.submit is not None:
         from . import __version__
 
         name = args.name or args.model or args.policy or "anonymous"
+        if trials > 1:
+            print(f"submitting the pass^{trials} numbers (reliability-adjusted)")
         payload = {
             "pack_id": pack_id,
             "model": name,
@@ -513,17 +566,27 @@ _ORACLE_TEMPLATE = '''\
 """Reference solution for {pack_id} — the ceiling the leaderboard chases.
 
 `agentsynth pack validate` runs this and requires a perfect score, which keeps
-the pack honest: every scenario stays solvable.
+the pack honest, and `agentsynth pack teach` exports its episodes as gold
+trajectories. Work like a careful operator: look first, act, read it back.
 """
 
-_SQL = {{
-    "close-ticket": "UPDATE tickets SET status='closed' WHERE id=3",
-    "count-open-tickets": "SELECT COUNT(*) FROM tickets WHERE status='open'",
-    "reopen-refused": "SELECT status FROM tickets WHERE id=4",
+# inspect -> act -> verify, one statement per step. Read-only tasks just read.
+_PLAN = {{
+    "close-ticket": [
+        "SELECT id, status FROM tickets WHERE id IN (3, 4)",
+        "UPDATE tickets SET status='closed' WHERE id=3",
+        "SELECT id, status FROM tickets WHERE id IN (3, 4)",
+    ],
+    "count-open-tickets": [
+        "SELECT COUNT(*) FROM tickets WHERE status='open'",
+    ],
+    "reopen-refused": [
+        "SELECT id, status FROM tickets WHERE id=4",
+    ],
 }}
 
 _ANSWER = {{
-    "close-ticket": "Ticket 3 is closed; ticket 4 left open.",
+    "close-ticket": "Ticket 3 is closed and verified; ticket 4 left open.",
     "count-open-tickets": "2 tickets are still open.",
     "reopen-refused": "Ticket 4 is closed, so I cannot reopen it.",
 }}
@@ -531,8 +594,9 @@ _ANSWER = {{
 
 def solve(observation, gym):
     sid = gym.scenario.id if gym.scenario is not None else ""
-    if gym.step_count == 0 and sid in _SQL:
-        return {{"tool_name": "sql_query", "arguments": {{"query": _SQL[sid]}}}}
+    plan = _PLAN.get(sid, [])
+    if gym.step_count < len(plan):
+        return {{"tool_name": "sql_query", "arguments": {{"query": plan[gym.step_count]}}}}
     return {{"answer": _ANSWER.get(sid, "Done.")}}
 '''
 
@@ -562,6 +626,18 @@ def _lazy_policy(observation, gym):
     return {"answer": "all done"}
 
 
+def _oracle_ref(pack_path: str, oracle_arg: Optional[str]) -> str:
+    """Explicit --oracle, or `<pack>_oracle.py:solve` sitting next to the pack."""
+    if oracle_arg:
+        return oracle_arg
+    default = f"{os.path.splitext(pack_path)[0]}_oracle.py"
+    if not os.path.exists(default):
+        raise SystemExit(
+            f"error: no oracle: expected '{default}' next to the pack, or pass --oracle"
+        )
+    return f"{default}:solve"
+
+
 def _cmd_pack_validate(args: argparse.Namespace) -> int:
     from .scenarios import load_scenarios, run_scenario_suite
 
@@ -587,16 +663,7 @@ def _cmd_pack_validate(args: argparse.Namespace) -> int:
         return 1
     print(f"[ok] schema — {len(scenarios)} scenarios, unique ids")
 
-    oracle_ref = args.oracle
-    if not oracle_ref:
-        stem = os.path.splitext(args.pack)[0]
-        default = f"{stem}_oracle.py"
-        if not os.path.exists(default):
-            raise SystemExit(
-                f"error: no oracle: expected '{default}' next to the pack, or pass --oracle"
-            )
-        oracle_ref = f"{default}:solve"
-    oracle = _load_policy_ref(oracle_ref)
+    oracle = _load_policy_ref(_oracle_ref(args.pack, args.oracle))
 
     first = run_scenario_suite(oracle, scenarios, seed=args.seed)
     if first.passed != first.n:
@@ -626,12 +693,48 @@ def _cmd_pack_validate(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_pack_teach(args: argparse.Namespace) -> int:
+    from .exporters import to_jsonl
+    from .rl import AgentGym
+    from .scenarios import load_scenarios
+
+    if not os.path.exists(args.pack):
+        raise SystemExit(f"error: pack not found: '{args.pack}'")
+    scenarios = load_scenarios(args.pack)
+    oracle = _load_policy_ref(_oracle_ref(args.pack, args.oracle))
+
+    trajectories = []
+    rewards = []
+    for scenario in scenarios:
+        gym = AgentGym.from_scenario(scenario, seed=args.seed)
+        try:
+            episode = gym.rollout(oracle)
+        finally:
+            gym.close()
+        outcome = episode.info.get("outcome", {})
+        if outcome.get("score", 0.0) < 1.0:
+            print(
+                f"[fail] {scenario.id}: oracle scored {outcome.get('score', 0.0):.2f} — "
+                "gold data has to pass every checker"
+            )
+            return 1
+        trajectories.append(episode.trajectory)
+        rewards.append(episode.total_reward)
+
+    to_jsonl(trajectories, args.out)
+    avg = sum(rewards) / (len(rewards) or 1)
+    print(f"{len(trajectories)} gold trajectories (avg reward {avg:.3f}) -> {args.out}")
+    return 0
+
+
 def _cmd_pack(args: argparse.Namespace) -> int:
     if args.pack_command == "new":
         return _cmd_pack_new(args)
     if args.pack_command == "validate":
         return _cmd_pack_validate(args)
-    print("usage: agentsynth pack {new,validate} ...")
+    if args.pack_command == "teach":
+        return _cmd_pack_teach(args)
+    print("usage: agentsynth pack {new,validate,teach} ...")
     return 1
 
 
