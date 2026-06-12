@@ -52,3 +52,4 @@ site/
 cloud/
 hub.db
 test_hub.db
+.claude/
