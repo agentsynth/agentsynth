@@ -183,22 +183,28 @@ def submit(payload: SubmissionIn, request: Request) -> dict:
         return {"id": row.id, "pack_id": row.pack_id, "pass_rate": row.pass_rate}
 
 
-@app.get("/v1/leaderboard")
-def leaderboard(pack: str = "core_v1", limit: int = 50) -> dict:
-    if pack not in PACKS:
-        raise HTTPException(status_code=404, detail="no such pack")
+def _best_per_model(pack: str, limit: int = 200) -> List[Submission]:
+    """Each model's best run for a pack, ranked."""
     with SessionLocal() as db:
         rows = (
             db.query(Submission)
             .filter(Submission.pack_id == pack)
             .order_by(Submission.pass_rate.desc(), Submission.created_at.asc())
-            .limit(max(1, min(limit, 200)))
+            .limit(max(1, min(limit, 500)))
             .all()
         )
     best: Dict[str, Submission] = {}
     for row in rows:
         if row.model not in best:
             best[row.model] = row
+    return list(best.values())
+
+
+@app.get("/v1/leaderboard")
+def leaderboard(pack: str = "core_v1", limit: int = 50) -> dict:
+    if pack not in PACKS:
+        raise HTTPException(status_code=404, detail="no such pack")
+    best = {row.model: row for row in _best_per_model(pack, limit)}
     entries = [
         {
             "rank": i + 1,
@@ -211,6 +217,33 @@ def leaderboard(pack: str = "core_v1", limit: int = 50) -> dict:
         for i, row in enumerate(best.values())
     ]
     return {"pack": pack, "entries": entries}
+
+
+@app.get("/v1/packs/{pack_id}/breakdown")
+def pack_breakdown(pack_id: str) -> dict:
+    """Per-scenario pass rates across each model's best run — what breaks models."""
+    if pack_id not in PACKS:
+        raise HTTPException(status_code=404, detail="no such pack")
+    best = _best_per_model(pack_id)
+    counts: Dict[str, Dict[str, int]] = {}
+    for row in best:
+        for r in row.results or []:
+            sid = str(r.get("id"))
+            slot = counts.setdefault(sid, {"passes": 0, "attempts": 0})
+            slot["attempts"] += 1
+            if r.get("passed"):
+                slot["passes"] += 1
+    scenarios = [
+        {
+            "id": sid,
+            "attempts": c["attempts"],
+            "passes": c["passes"],
+            "pass_rate": round(c["passes"] / c["attempts"], 4) if c["attempts"] else None,
+        }
+        for sid, c in counts.items()
+    ]
+    scenarios.sort(key=lambda s: (s["pass_rate"] if s["pass_rate"] is not None else 2.0, s["id"]))
+    return {"pack": pack_id, "models": len(best), "scenarios": scenarios}
 
 
 @app.get("/leaderboard", response_class=HTMLResponse)
@@ -230,6 +263,22 @@ def leaderboard_page(pack: str = "core_v1") -> str:
         "pip install agentsynth-ai && agentsynth bench "
         f"--pack {pack} --model &lt;model&gt; --submit https://api.agentsynth.tech"
     )
+
+    hardest_html = ""
+    breakdown = pack_breakdown(pack)
+    toughest = [s for s in breakdown["scenarios"] if s["pass_rate"] is not None][:3]
+    if toughest and breakdown["models"] >= 2:
+        rows_h = "".join(
+            f"<tr><td class='m'>{_esc(s['id'])}</td>"
+            f"<td><b>{s['pass_rate']:.0%}</b></td>"
+            f"<td class='d'>{s['passes']}/{s['attempts']} models</td></tr>"
+            for s in toughest
+        )
+        hardest_html = (
+            '<h2 class="sub-h">Hardest scenarios</h2>'
+            '<table><tr><th>scenario</th><th>pass rate</th><th class="d">across</th></tr>'
+            f"{rows_h}</table>"
+        )
     return f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light">
@@ -248,6 +297,8 @@ nav{{display:flex;align-items:center;justify-content:space-between;height:64px}}
 nav .links a{{color:var(--ink);margin-left:22px;font-size:15px}}
 nav .links a:hover{{color:var(--accent)}}
 h1{{font-size:30px;letter-spacing:-.02em;margin:40px 0 6px}}
+h2.sub-h{{font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);
+margin:34px 0 6px;font-weight:700}}
 p.sub{{color:var(--muted);margin:0 0 28px}}
 table{{border-collapse:collapse;width:100%}}
 td,th{{padding:10px 8px;border-bottom:1px solid var(--line);text-align:left;font-size:15px}}
@@ -274,6 +325,7 @@ ends up in the goal state. Packs are deterministic; reproduce any entry.</p>
 <table><tr><th>#</th><th>model</th><th>pass rate</th><th>scenarios</th>
 <th class="d">submitted</th></tr>
 {rows}</table>
+{hardest_html}
 <div class="how"><p><b>Get on the board</b> — any LiteLLM model, or your own agent loop via
 <a href="https://github.com/agentsynth/agentsynth#bench-a-model-get-on-the-leaderboard">--policy</a>:</p>
 <code>{cmd}</code></div>

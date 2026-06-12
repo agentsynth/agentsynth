@@ -58,6 +58,30 @@ def test_submit_and_leaderboard():
     assert "model-a" in page and "80%" in page
 
 
+def test_breakdown_ranks_hardest_scenarios_first():
+    # two models, best run each: s0 fails for both, s1 fails for one, the rest pass
+    for model, fail_ids in (("bd-model-a", {"s0", "s1"}), ("bd-model-b", {"s0"})):
+        results = [{"id": f"s{i}", "passed": f"s{i}" not in fail_ids} for i in range(N)]
+        passed = sum(1 for r in results if r["passed"])
+        report = {"n": N, "passed": passed, "pass_rate": passed / N, "results": results}
+        resp = client.post(
+            "/v1/submissions", json={"pack_id": PACK_ID, "model": model, "report": report}
+        )
+        assert resp.status_code == 201, resp.text
+
+    data = client.get(f"/v1/packs/{PACK_ID}/breakdown").json()
+    assert data["models"] >= 2
+    by_id = {s["id"]: s for s in data["scenarios"]}
+    assert by_id["s0"]["pass_rate"] < by_id["s1"]["pass_rate"] < by_id["s2"]["pass_rate"]
+    assert data["scenarios"][0]["pass_rate"] <= data["scenarios"][-1]["pass_rate"]
+
+    assert client.get("/v1/packs/nope/breakdown").status_code == 404
+
+    page = client.get("/leaderboard", params={"pack": PACK_ID}).text
+    assert "Hardest scenarios" in page
+    assert "s0" in page
+
+
 def test_home_serves_the_landing():
     page = client.get("/").text
     assert "Agent training data" in page
