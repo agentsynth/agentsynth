@@ -29,6 +29,19 @@ print(result.overall, result.passed)
 print(verify_trajectory(traj).verified)               # re-checks tool args, execution, safety
 ```
 
+## Get on the leaderboard
+
+`core_v1` is ten outcome-checked business tasks over a writable SQL world — a run
+passes only when the world ends up in the goal state. The pack downloads itself,
+so this works anywhere:
+
+```bash
+agentsynth bench --pack core_v1 --model <your-model> --submit
+```
+
+The live board is at [agentsynth.tech](https://agentsynth.tech/leaderboard);
+`--policy mypkg.module:fn` benches your own agent loop instead of a LiteLLM model.
+
 ## Where to go next
 
 - **[Vision](VISION.md)** — the problem, the bet, and the principles.
