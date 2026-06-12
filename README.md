@@ -518,6 +518,23 @@ agentsynth pack validate packs/my_domain_v1.yaml
 
 See [`packs/README.md`](packs/README.md) for the gates a pack must pass.
 
+### Gate your CI on pass^k
+
+Agents regress quietly; put the pack in front of every merge. The repo doubles
+as a GitHub Action that fails the job when reliability drops below a floor:
+
+```yaml
+- uses: agentsynth/agentsynth@main
+  with:
+    pack: packs/my_domain_v1.yaml
+    policy: ci/my_agent.py:solve     # or model: gpt-4o-mini
+    trials: "4"                      # pass^4: every trial must pass
+    min-pass-rate: "0.8"
+```
+
+`agentsynth bench --json report.json` writes the same machine-readable report
+for custom pipelines.
+
 ### Import your production traces
 
 OpenAI-style `tool_calls` logs, Anthropic `tool_use` blocks, and OpenTelemetry

@@ -1,0 +1,67 @@
+name: AgentSynth bench
+description: >-
+  Gate CI on an outcome-checked scenario pack: run agentsynth bench and fail
+  the job when the pass rate drops below a floor. Use --trials for pass^k.
+branding:
+  icon: check-circle
+  color: purple
+
+inputs:
+  pack:
+    description: Pack name, file, or URL (names resolve via packs/ then the hub).
+    default: core_v1
+  policy:
+    description: Policy as module:fn or file.py:fn (instead of model).
+    default: ""
+  model:
+    description: LiteLLM model id to drive the episodes (instead of policy).
+    default: ""
+  trials:
+    description: Trials K for pass^K — a scenario counts only when every trial passes.
+    default: "1"
+  min-pass-rate:
+    description: Fail the job when pass_rate lands under this floor (0..1).
+    default: "1.0"
+  install:
+    description: pip install agentsynth-ai first ("false" when the workflow already did).
+    default: "true"
+  version:
+    description: Version spec appended to the install, e.g. ==0.7.0 or >=0.6.2.
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    - name: install agentsynth
+      if: inputs.install == 'true'
+      shell: bash
+      run: python -m pip install --quiet "agentsynth-ai${{ inputs.version }}"
+
+    - name: bench
+      shell: bash
+      run: |
+        args=(bench --pack "${{ inputs.pack }}" --trials "${{ inputs.trials }}" --json agentsynth_report.json)
+        if [ -n "${{ inputs.policy }}" ]; then args+=(--policy "${{ inputs.policy }}"); fi
+        if [ -n "${{ inputs.model }}" ]; then args+=(--model "${{ inputs.model }}"); fi
+        python -m agentsynth.cli "${args[@]}"
+
+    - name: gate
+      shell: bash
+      env:
+        MIN_PASS_RATE: ${{ inputs.min-pass-rate }}
+      run: |
+        python - <<'PY'
+        import json
+        import os
+        import sys
+
+        report = json.load(open("agentsynth_report.json"))
+        floor = float(os.environ["MIN_PASS_RATE"])
+        rate = float(report["pass_rate"])
+        k = report.get("trials", 1)
+        label = f"pass^{k}" if k > 1 else "pass rate"
+        print(f"{label}: {rate:.0%} (floor {floor:.0%})")
+        if rate < floor:
+            print("below the floor — failing the job")
+            sys.exit(1)
+        PY

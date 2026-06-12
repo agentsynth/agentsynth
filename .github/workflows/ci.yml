@@ -98,3 +98,24 @@ jobs:
         with:
           name: dist
           path: dist/*
+
+  bench-action:
+    name: bench action self-test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: python -m pip install --upgrade pip && pip install -e .
+      - name: gate on the oracle (must hold a perfect pass^2)
+        uses: ./
+        env:
+          AGENTSYNTH_FORCE_MOCK: "1"
+        with:
+          pack: packs/core_v1.yaml
+          policy: examples/core_v1_oracle.py:solve
+          trials: "2"
+          min-pass-rate: "1.0"
+          install: "false"

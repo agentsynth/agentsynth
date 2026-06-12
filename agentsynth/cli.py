@@ -190,6 +190,13 @@ def _build_parser() -> argparse.ArgumentParser:
     bench.add_argument(
         "--name", default=None, help="Label for the submission (defaults to --model)."
     )
+    bench.add_argument(
+        "--json",
+        dest="json_out",
+        default=None,
+        metavar="PATH",
+        help="Write the full report as JSON — for CI gates and analysis.",
+    )
 
     pack = sub.add_parser(
         "pack",
@@ -453,6 +460,7 @@ def _cmd_bench(args: argparse.Namespace) -> int:
 
     trials = max(1, int(args.trials))
     reports = [run_scenario_suite(policy, scenarios, seed=args.seed + t) for t in range(trials)]
+    pass1_avg = None
 
     if trials == 1:
         report = reports[0]
@@ -479,11 +487,27 @@ def _cmd_bench(args: argparse.Namespace) -> int:
         passed = sum(1 for row in agg if row["passed"])
         n = len(agg) or 1
         avg = sum(rep.pass_rate for rep in reports) / len(reports)
+        pass1_avg = round(avg, 4)
         report = ScenarioReport(
             n=len(agg), passed=passed, pass_rate=round(passed / n, 4), results=agg
         )
         print(f"\npass^1 (avg of {trials} trials): {avg:.0%}")
         print(f"pass^{trials} (all trials must pass): {passed}/{len(agg)} ({report.pass_rate:.0%})")
+
+    if args.json_out:
+        import json
+
+        blob = {
+            "pack_id": pack_id,
+            "name": args.name or args.model or args.policy or "anonymous",
+            "seed": args.seed,
+            "trials": trials,
+            "pass1_avg": pass1_avg,
+            **report.model_dump(),
+        }
+        with open(args.json_out, "w", encoding="utf-8") as fh:
+            json.dump(blob, fh, indent=2)
+        print(f"report -> {args.json_out}")
 
     if args.submit is not None:
         from . import __version__

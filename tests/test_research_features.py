@@ -85,6 +85,31 @@ def test_pack_teach_exports_gold_trajectories(scaffold, tmp_path, capsys):
     assert {t.query[:10] for t in trajs} == {r["query"][:10] for r in rows}
 
 
+def test_bench_json_report(scaffold, tmp_path, capsys):
+    pack, oracle = scaffold
+    out = tmp_path / "report.json"
+    code = cli_main(
+        [
+            "bench",
+            "--pack",
+            str(pack),
+            "--policy",
+            f"{oracle}:solve",
+            "--trials",
+            "2",
+            "--json",
+            str(out),
+        ]
+    )
+    assert code == 0
+    report = json.loads(out.read_text())
+    assert report["trials"] == 2
+    assert report["pass1_avg"] == 1.0
+    assert report["pass_rate"] == 1.0
+    assert len(report["results"]) == 3
+    assert report["pack_id"] == "demo_v1"
+
+
 def test_pack_teach_rejects_an_imperfect_oracle(scaffold, tmp_path, capsys):
     pack, oracle = scaffold
     oracle.write_text(
