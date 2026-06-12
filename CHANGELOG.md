@@ -6,6 +6,22 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.7.1] - 2026-06-12
+
+### Added
+
+- Bring-your-own-loop adapters: `to_openai_tools` exports a world's tools as
+  OpenAI function-calling schemas and `action_from_openai_tool_call` turns the
+  model's call back into a gym action, so OpenAI SDK / LangGraph / CrewAI loops
+  drive `AgentGym.reset()`/`step()` directly. The final step's `info["outcome"]`
+  carries the world-state verdict.
+- `bench --compare a,b,c` runs model ids and/or policy refs side by side and
+  prints one pass^k-aware table; `--json` captures every run, and `--submit`
+  posts each under its own name.
+- A green local bench suggests `--submit`, a clean validate points at the pack
+  registry, and the CI action gained `submit`/`name` inputs so pipelines can
+  feed the leaderboard on every run.
+
 ## [0.7.0] - 2026-06-12
 
 ### Added
