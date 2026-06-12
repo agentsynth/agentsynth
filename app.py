@@ -285,13 +285,103 @@ def _empty_fig(title: str = "No data yet"):
     return _brand(fig)
 
 
+def _kpi_cards(metrics: Dict[str, Any]) -> str:
+    """The dataset numbers as a row of stat cards instead of a skinny table."""
+
+    def pct(v: Any) -> str:
+        return "—" if v is None else f"{float(v):.0%}"
+
+    def num(v: Any, nd: int = 2) -> str:
+        return "—" if v is None else f"{float(v):.{nd}f}"
+
+    cards = [
+        ("Trajectories", str(metrics.get("num_trajectories", 0))),
+        ("Evaluated", str(metrics.get("num_evaluated", 0))),
+        ("Pass@1", pct(metrics.get("pass_rate"))),
+        ("Avg overall", num(metrics.get("avg_overall"), 3)),
+        ("Avg steps", num(metrics.get("avg_steps"), 1)),
+        ("Avg tool calls", num(metrics.get("avg_tool_calls"), 1)),
+        ("Unique tools", str(metrics.get("unique_tools", 0))),
+        ("Tool coverage", pct(metrics.get("tool_coverage", 0.0))),
+        ("Diversity", num(metrics.get("diversity_score", 0.0), 2)),
+    ]
+    items = "".join(
+        f'<div class="kpi"><div class="kpi-v">{_esc(v)}</div>'
+        f'<div class="kpi-l">{_esc(k)}</div></div>'
+        for k, v in cards
+    )
+    return f'<div class="kpis">{items}</div>'
+
+
+def _fig_dim_spread(eval_results: Optional[List[Any]]):
+    """Score distribution per rubric dimension — the variance the means hide."""
+    import plotly.graph_objects as go
+
+    fig = go.Figure()
+    if eval_results:
+        for dim in RUBRIC_DIMENSIONS:
+            vals = [float(ev.flat().get(dim, 0.0)) for ev in eval_results]
+            fig.add_trace(
+                go.Box(
+                    y=vals,
+                    name=dim.replace("_", " "),
+                    boxmean=True,
+                    line_color="#4f46e5",
+                    fillcolor="rgba(79,70,229,0.15)",
+                    marker=dict(color="#4f46e5", size=4, opacity=0.6),
+                )
+            )
+        fig.update_layout(
+            title="Rubric spread per dimension", showlegend=False, yaxis_range=[-0.05, 1.05]
+        )
+    else:
+        fig.update_layout(title="Rubric spread — run the judge first")
+    return _brand(fig)
+
+
+def _fig_score_vs_steps(trajectories: Optional[List[Any]], eval_results: Optional[List[Any]]):
+    """Overall score against trajectory length — does rambling cost quality?"""
+    import plotly.graph_objects as go
+
+    fig = go.Figure()
+    by_id = _eval_by_id(eval_results)
+    points = [
+        (t.num_steps(), float(by_id[t.id].overall), bool(by_id[t.id].passed), t.id)
+        for t in trajectories or []
+        if t.id in by_id
+    ]
+    if points:
+        for passed, color, label in ((True, "#0f9d58", "pass"), (False, "#ef4444", "fail")):
+            group = [p for p in points if p[2] is passed]
+            if group:
+                fig.add_trace(
+                    go.Scatter(
+                        x=[p[0] for p in group],
+                        y=[p[1] for p in group],
+                        mode="markers",
+                        name=label,
+                        text=[p[3] for p in group],
+                        marker=dict(size=9, color=color, opacity=0.75),
+                    )
+                )
+        fig.update_layout(
+            title="Score vs trajectory length",
+            xaxis_title="steps",
+            yaxis_title="overall",
+            yaxis_range=[-0.05, 1.05],
+        )
+    else:
+        fig.update_layout(title="Score vs length — run the judge first")
+    return _brand(fig)
+
+
 def _five_empty_figs() -> Tuple[Any, Any, Any, Any, Any]:
     return (
         _empty_fig("Rubric radar — no data"),
         _empty_fig("Score distribution — no data"),
-        _empty_fig("Pass@1 — no data"),
+        _empty_fig("Rubric spread — no data"),
+        _empty_fig("Score vs length — no data"),
         _empty_fig("Tool usage — no data"),
-        _empty_fig("Step distribution — no data"),
     )
 
 
@@ -470,14 +560,14 @@ def do_metrics(
 
     try:
         metrics = compute_dataset_metrics(trajectories, eval_results or None)
-        summary = M.metrics_summary_md(metrics)
+        summary = _kpi_cards(metrics)
 
         radar = _brand(M.plot_rubric_radar(eval_results or None))
         dist = _brand(M.plot_score_distribution(eval_results or None))
-        gauge = _brand(M.plot_pass_gauge(eval_results or None))
+        spread = _fig_dim_spread(eval_results or None)
+        scatter = _fig_score_vs_steps(trajectories, eval_results or None)
         tools = _brand(M.plot_tool_usage(trajectories))
-        steps = _brand(M.plot_step_distribution(trajectories))
-        return (summary, radar, dist, gauge, tools, steps)
+        return (summary, radar, dist, spread, scatter, tools)
 
     except Exception as exc:
         gr.Warning(f"Metrics failed: {exc}")
@@ -586,8 +676,20 @@ _CSS = """
 .gradio-container{max-width:1200px !important;margin:0 auto !important}
 footer{display:none !important}
 
-#tool-catalog .cm-editor{max-height:460px}
+/* the JSON editor stretches to the bottom of the settings column and scrolls inside */
+#tool-catalog{flex:1 1 0;min-height:240px;display:flex;flex-direction:column}
+#tool-catalog > .wrap:last-child{flex:1;min-height:0;display:flex;flex-direction:column}
+#tool-catalog .codemirror-wrapper{flex:1;min-height:0}
+#tool-catalog .cm-editor{height:100%;max-height:none}
 #tool-catalog .cm-scroller{overflow:auto}
+#traj-detail{max-height:760px;overflow-y:auto}
+
+#kpi-summary{width:100%}
+.kpis{display:grid;gap:12px;margin:6px 0 4px;
+  grid-template-columns:repeat(auto-fit,minmax(110px,1fr))}
+.kpi{background:#fff;border:1px solid #e7e9ee;border-radius:12px;padding:14px 16px}
+.kpi-v{font-size:22px;font-weight:800;letter-spacing:-.02em;color:#11141a}
+.kpi-l{font-size:12px;color:#5b6471;margin-top:2px}
 
 #as-header{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;
   gap:8px;padding:14px 4px 12px;margin-bottom:4px;
@@ -675,6 +777,9 @@ footer{display:none !important}
 .dark #as-header .links a{color:#9aa3b2}
 .dark #as-header .links a:hover{color:#a5b4fc}
 .dark #as-header .tag{background:rgba(99,102,241,.18)}
+.dark .kpi{background:#14161c;border-color:#272b36}
+.dark .kpi-v{color:#e6e9f0}
+.dark .kpi-l{color:#9aa3b2}
 """
 
 _THEME = gr.themes.Soft(
@@ -699,7 +804,7 @@ with gr.Blocks(title="AgentSynth — playground", **_BLOCKS_KW) as demo:
     eval_state = gr.State([])  # List[EvalResult]
 
     with gr.Tab("Generate"):
-        with gr.Row(equal_height=False):
+        with gr.Row(equal_height=True):
             with gr.Column(scale=7):
                 gen_query = gr.Textbox(
                     label="User query",
@@ -782,13 +887,14 @@ with gr.Blocks(title="AgentSynth — playground", **_BLOCKS_KW) as demo:
                     label="Click a row to inspect it",
                     wrap=True,
                     interactive=False,
-                    max_height=520,
+                    max_height=760,
                     column_widths=["6%", "15%", "12%", "9%", "10%", "22%", "26%"],
                 )
             with gr.Column(scale=6):
                 gen_tree = gr.Markdown(
                     value="_Generate a batch, then click a row in the overview to inspect it._",
                     label="Selected trajectory",
+                    elem_id="traj-detail",
                 )
 
         gen_btn.click(
@@ -862,18 +968,19 @@ with gr.Blocks(title="AgentSynth — playground", **_BLOCKS_KW) as demo:
                 "Refresh metrics", variant="primary", elem_id="metrics-btn", scale=0
             )
         metrics_summary = gr.Markdown(
-            "Click **Refresh metrics** after generating (and optionally evaluating)."
+            "Click **Refresh metrics** after generating (and optionally evaluating).",
+            elem_id="kpi-summary",
         )
         with gr.Row():
             with gr.Column():
                 plot_radar = gr.Plot(label="Rubric radar (mean per dimension)")
             with gr.Column():
-                plot_gauge = gr.Plot(label="Pass@1 gauge")
+                plot_spread = gr.Plot(label="Rubric spread per dimension")
         with gr.Row():
             with gr.Column():
                 plot_dist = gr.Plot(label="Overall score distribution")
             with gr.Column():
-                plot_steps = gr.Plot(label="Steps per trajectory")
+                plot_scatter = gr.Plot(label="Score vs trajectory length")
         with gr.Row():
             plot_tools = gr.Plot(label="Tool usage (top 15)")
 
@@ -884,9 +991,9 @@ with gr.Blocks(title="AgentSynth — playground", **_BLOCKS_KW) as demo:
                 metrics_summary,
                 plot_radar,
                 plot_dist,
-                plot_gauge,
+                plot_spread,
+                plot_scatter,
                 plot_tools,
-                plot_steps,
             ],
         )
 
