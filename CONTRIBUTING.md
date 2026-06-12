@@ -51,6 +51,21 @@ tree at once: `pre-commit run --all-files`.
   top (except `app.py`).
 - Add or update a test for anything you change. The suite is in `tests/`.
 
+## Contribute a scenario pack
+
+The highest-leverage contribution is a pack for a domain you know: real tasks
+over a seeded world, checkers on the end state, an oracle proving it's solvable.
+Scaffold one, make it yours, and run the gate locally:
+
+```bash
+agentsynth pack new my_domain_v1 --dir packs
+agentsynth pack validate packs/my_domain_v1.yaml
+```
+
+CI runs the same validation on every PR. [packs/README.md](packs/README.md) has
+the full checklist and the registry table to add yourself to. Once merged, the
+pack gets its own live leaderboard.
+
 ## Pull requests
 
 1. Branch off `main`, make your change, add tests.

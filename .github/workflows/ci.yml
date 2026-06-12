@@ -48,6 +48,16 @@ jobs:
         env:
           AGENTSYNTH_FORCE_MOCK: "1"
         run: pytest --cov=agentsynth --cov-report=xml --cov-report=term-missing
+      - name: validate packs
+        env:
+          AGENTSYNTH_FORCE_MOCK: "1"
+        run: |
+          python -m agentsynth.cli pack validate packs/core_v1.yaml \
+            --oracle examples/core_v1_oracle.py:solve
+          for f in packs/*.yaml; do
+            [ "$f" = "packs/core_v1.yaml" ] && continue
+            python -m agentsynth.cli pack validate "$f"
+          done
       - name: Upload coverage to Codecov
         if: matrix.python-version == '3.11'
         uses: codecov/codecov-action@v4

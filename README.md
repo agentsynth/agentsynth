@@ -505,6 +505,16 @@ agentsynth bench --pack core_v1 --model claude-haiku-4-5-20251001 --submit
 [`examples/core_v1_oracle.py`](examples/core_v1_oracle.py) is the reference
 solution — the ceiling every entry chases.
 
+Packs are community-extensible — scaffold one for your domain and it gets its
+own live leaderboard once merged:
+
+```bash
+agentsynth pack new my_domain_v1 --dir packs   # skeleton + oracle stub
+agentsynth pack validate packs/my_domain_v1.yaml
+```
+
+See [`packs/README.md`](packs/README.md) for the gates a pack must pass.
+
 ### Import your production traces
 
 OpenAI-style `tool_calls` logs, Anthropic `tool_use` blocks, and OpenTelemetry
