@@ -243,7 +243,7 @@ def eval_rows(eval_results: List[Any]) -> List[List[Any]]:
 
 
 _EVAL_HEADERS = ["trajectory_id", "overall", "passed"] + list(RUBRIC_DIMENSIONS)
-_OVERVIEW_HEADERS = ["idx", "mode", "domain", "steps", "score", "tools_used", "final_answer"]
+_OVERVIEW_HEADERS = ["#", "mode", "domain", "steps", "score", "tools", "answer"]
 
 
 _PLOT_COLORWAY = ["#4f46e5", "#818cf8", "#0f9d58", "#f59e0b", "#ef4444", "#64748b"]
@@ -586,7 +586,7 @@ _CSS = """
 .gradio-container{max-width:1200px !important;margin:0 auto !important}
 footer{display:none !important}
 
-#tool-catalog .cm-editor{max-height:380px}
+#tool-catalog .cm-editor{max-height:460px}
 #tool-catalog .cm-scroller{overflow:auto}
 
 #as-header{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;
@@ -735,9 +735,8 @@ with gr.Blocks(title="AgentSynth — playground", **_BLOCKS_KW) as demo:
                     gen_vary = gr.Checkbox(
                         label="Vary modes across the batch (diversity)", value=False
                     )
-                gen_btn = gr.Button(
-                    "Generate batch", variant="primary", size="lg", elem_id="gen-btn"
-                )
+
+        gen_btn = gr.Button("Generate batch", variant="primary", size="lg", elem_id="gen-btn")
 
         gr.Examples(
             label="Try one",
@@ -773,19 +772,18 @@ with gr.Blocks(title="AgentSynth — playground", **_BLOCKS_KW) as demo:
                         ["all", "single_agent", "multi_agent", "code_execution"],
                         value="all",
                         label="Mode",
-                        scale=2,
+                        scale=1,
                     )
                     ov_min_score = gr.Slider(
-                        0.0, 1.0, value=0.0, step=0.05, label="Min judge score", scale=3
+                        0.0, 1.0, value=0.0, step=0.05, label="Min score", scale=2
                     )
-                    ov_filter_btn = gr.Button("Filter", scale=1)
                 gen_overview = gr.Dataframe(
                     headers=_OVERVIEW_HEADERS,
                     label="Click a row to inspect it",
                     wrap=True,
                     interactive=False,
-                    max_height=460,
-                    column_widths=["7%", "16%", "12%", "9%", "10%", "22%", "24%"],
+                    max_height=520,
+                    column_widths=["6%", "15%", "12%", "9%", "10%", "22%", "26%"],
                 )
             with gr.Column(scale=6):
                 gen_tree = gr.Markdown(
@@ -813,29 +811,34 @@ with gr.Blocks(title="AgentSynth — playground", **_BLOCKS_KW) as demo:
             inputs=[traj_state, eval_state, gen_overview],
             outputs=[gen_tree],
         )
-        ov_filter_btn.click(
+        # filters apply as they change — no apply button to hunt for
+        ov_mode.change(
+            do_filter_overview,
+            inputs=[traj_state, eval_state, ov_mode, ov_min_score],
+            outputs=[gen_overview],
+        )
+        ov_min_score.release(
             do_filter_overview,
             inputs=[traj_state, eval_state, ov_mode, ov_min_score],
             outputs=[gen_overview],
         )
 
     with gr.Tab("Evaluate"):
-        with gr.Row(equal_height=False):
-            with gr.Column(scale=5):
-                eval_model = gr.Dropdown(
-                    choices=_MODEL_CHOICES,
-                    value=_DEFAULT_MODEL_CHOICE,
-                    label="Judge model",
-                    allow_custom_value=True,
-                    info="Offline heuristic judge by default.",
-                )
-                eval_threshold = gr.Slider(0.0, 1.0, value=0.6, step=0.01, label="Pass threshold")
-                eval_btn = gr.Button(
-                    "Run the judge", variant="primary", size="lg", elem_id="eval-btn"
-                )
-            with gr.Column(scale=7):
-                with gr.Accordion("What the judge scores", open=False):
-                    gr.Markdown(_RUBRIC_MD)
+        with gr.Row():
+            eval_model = gr.Dropdown(
+                choices=_MODEL_CHOICES,
+                value=_DEFAULT_MODEL_CHOICE,
+                label="Judge model",
+                allow_custom_value=True,
+                info="Offline heuristic judge by default.",
+                scale=2,
+            )
+            eval_threshold = gr.Slider(
+                0.0, 1.0, value=0.6, step=0.01, label="Pass threshold", scale=1
+            )
+        with gr.Accordion("What the judge scores", open=False):
+            gr.Markdown(_RUBRIC_MD)
+        eval_btn = gr.Button("Run the judge", variant="primary", size="lg", elem_id="eval-btn")
 
         eval_summary = gr.Markdown(
             "Generate trajectories on the **Generate** tab, then run the judge here."
@@ -889,9 +892,9 @@ with gr.Blocks(title="AgentSynth — playground", **_BLOCKS_KW) as demo:
 
     with gr.Tab("Export"):
         gr.Markdown(_EXPORT_MD)
-        with gr.Row():
+        with gr.Row(equal_height=True):
             export_fmt = gr.Dropdown(
-                ["jsonl", "sharegpt", "adp"], value="jsonl", label="Format", scale=2
+                ["jsonl", "sharegpt", "adp"], value="jsonl", label="Format", scale=3
             )
             export_btn = gr.Button("Build dataset file", variant="primary", scale=1)
 
