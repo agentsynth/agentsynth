@@ -1,0 +1,365 @@
+# AgentSynth core pack, v2. Fourteen outcome-checked tasks over writable SQL worlds,
+# graded only by the database's end state. v2 raises the bar over core_v1: conditional
+# logic, aggregation, traps you must NOT fall for, and multi-table consistency where an
+# agent has to keep two tables in agreement. Each scenario carries a difficulty tier in
+# metadata. A run passes only when every checker holds.
+
+# ---- easy: a single, unambiguous mutation or read ----------------------------------
+
+- id: raise-ticket-priority
+  task: Raise ticket 3 to high priority. Leave the other tickets exactly as they are.
+  metadata: {tier: easy, skills: [mutation]}
+  max_steps: 6
+  environment:
+    type: sql
+    schema: CREATE TABLE tickets (id INTEGER PRIMARY KEY, subject TEXT, priority TEXT)
+    table: tickets
+    rows:
+      - [1, "login bug", "normal"]
+      - [2, "typo", "low"]
+      - [3, "outage", "normal"]
+  checkers:
+    - kind: sql
+      query: SELECT priority FROM tickets WHERE id=3
+      equals: [["high"]]
+    - kind: sql
+      query: SELECT priority FROM tickets WHERE id=1
+      equals: [["normal"]]
+
+- id: count-open-tickets
+  task: How many tickets are currently open? Answer with just the number.
+  metadata: {tier: easy, skills: [read, aggregate]}
+  max_steps: 6
+  environment:
+    type: sql
+    schema: CREATE TABLE tickets (id INTEGER PRIMARY KEY, status TEXT)
+    table: tickets
+    rows:
+      - [1, "open"]
+      - [2, "closed"]
+      - [3, "open"]
+      - [4, "open"]
+  checkers:
+    - kind: called_tool
+      name: sql_query
+    - kind: answer
+      any_of: ["3", "three"]
+
+- id: refuse-cancel-shipped
+  task: >-
+    A customer asks to cancel order 9. Company policy forbids cancelling orders that
+    have already shipped — check its status and answer accordingly, without changing
+    anything.
+  metadata: {tier: easy, skills: [refusal, read]}
+  max_steps: 6
+  environment:
+    type: sql
+    schema: CREATE TABLE orders (id INTEGER PRIMARY KEY, customer TEXT, status TEXT)
+    table: orders
+    rows:
+      - [9, "j.smith", "shipped"]
+  checkers:
+    - kind: sql
+      query: SELECT status FROM orders WHERE id=9
+      equals: [["shipped"]]
+    - kind: called_tool
+      name: sql_query
+    - kind: answer
+      any_of: ["shipped", "cannot", "can't", "unable", "policy"]
+
+# ---- medium: a condition to get right, or a trap to avoid --------------------------
+
+- id: refund-if-eligible
+  task: >-
+    Refund order 7, but only if it is still 'paid' and its total is at most 200.
+    Confirm what you did. Do not touch any other order.
+  metadata: {tier: medium, skills: [conditional, trap]}
+  max_steps: 10
+  environment:
+    type: sql
+    schema: CREATE TABLE orders (id INTEGER PRIMARY KEY, customer TEXT, status TEXT, total REAL)
+    table: orders
+    rows:
+      - [7, "an.tran", "paid", 129.0]
+      - [8, "li.wei", "paid", 640.0]
+      - [9, "j.smith", "shipped", 240.0]
+  checkers:
+    - kind: sql
+      query: SELECT status FROM orders WHERE id=7
+      equals: [["refunded"]]
+    - kind: sql
+      query: SELECT status FROM orders WHERE id=8
+      equals: [["paid"]]
+    - kind: sql
+      query: SELECT status FROM orders WHERE id=9
+      equals: [["shipped"]]
+    - kind: answer
+      any_of: ["refund"]
+
+- id: clearance-discount
+  task: Cut 20 percent off every clearance product priced over 100. Leave everything else unchanged.
+  metadata: {tier: medium, skills: [conditional, arithmetic, trap]}
+  max_steps: 10
+  environment:
+    type: sql
+    schema: CREATE TABLE products (id INTEGER PRIMARY KEY, name TEXT, category TEXT, price REAL)
+    table: products
+    rows:
+      - [1, "Robot", "clearance", 150.0]
+      - [2, "Bear", "clearance", 80.0]
+      - [3, "Lamp", "home", 120.0]
+      - [4, "Mug", "clearance", 40.0]
+  checkers:
+    - kind: sql
+      query: SELECT price FROM products WHERE id=1
+      equals: [[120.0]]
+    - kind: sql
+      query: SELECT price FROM products WHERE id=2
+      equals: [[80.0]]
+    - kind: sql
+      query: SELECT price FROM products WHERE id=3
+      equals: [[120.0]]
+
+- id: deactivate-stale-users
+  task: >-
+    Deactivate every user who is currently active but hasn't logged in since the start
+    of 2025. Report how many you deactivated.
+  metadata: {tier: medium, skills: [conditional, aggregate]}
+  max_steps: 10
+  environment:
+    type: sql
+    schema: CREATE TABLE users (id INTEGER PRIMARY KEY, email TEXT, active INTEGER, last_login TEXT)
+    table: users
+    rows:
+      - [1, "a@x.io", 1, "2023-11-02"]
+      - [2, "b@x.io", 1, "2026-02-01"]
+      - [3, "c@x.io", 1, "2024-06-30"]
+      - [4, "d@x.io", 0, "2022-01-01"]
+  checkers:
+    - kind: sql
+      query: SELECT COUNT(*) FROM users WHERE active=1
+      equals: [[1]]
+    - kind: sql
+      query: SELECT active FROM users WHERE id=2
+      equals: [[1]]
+    - kind: answer
+      any_of: ["2", "two"]
+
+- id: top-customer-spend
+  task: >-
+    Which customer has spent the most across all their orders? Answer with the customer
+    name and their total.
+  metadata: {tier: medium, skills: [aggregate, trap]}
+  max_steps: 10
+  environment:
+    type: sql
+    schema: CREATE TABLE orders (id INTEGER PRIMARY KEY, customer TEXT, total REAL)
+    table: orders
+    rows:
+      - [1, "alice", 120.0]
+      - [2, "bob", 300.0]
+      - [3, "alice", 250.0]
+      - [4, "bob", 90.0]
+      - [5, "carol", 410.0]
+  checkers:
+    - kind: called_tool
+      name: sql_query
+    - kind: answer
+      any_of: ["carol"]
+    - kind: answer
+      any_of: ["410"]
+
+- id: payroll-cap
+  task: >-
+    No one may earn more than 20000 per month. Cap anyone over the limit to exactly
+    20000, and name everyone you adjusted.
+  metadata: {tier: medium, skills: [conditional, multi-row]}
+  max_steps: 10
+  environment:
+    type: sql
+    schema: CREATE TABLE payroll (id INTEGER PRIMARY KEY, name TEXT, monthly REAL)
+    table: payroll
+    rows:
+      - [1, "Anh", 8000.0]
+      - [2, "Binh", 26000.0]
+      - [3, "Chi", 12000.0]
+      - [4, "Dung", 31000.0]
+  checkers:
+    - kind: sql
+      query: SELECT COUNT(*) FROM payroll WHERE monthly > 20000
+      equals: [[0]]
+    - kind: sql
+      query: SELECT monthly FROM payroll WHERE id=2
+      equals: [[20000.0]]
+    - kind: sql
+      query: SELECT monthly FROM payroll WHERE id=1
+      equals: [[8000.0]]
+    - kind: answer
+      any_of: ["Binh"]
+    - kind: answer
+      any_of: ["Dung"]
+
+- id: dedup-keep-latest
+  task: >-
+    The email m@x.io appears twice in contacts. Keep only the most recently updated row
+    for it and delete the older duplicate. Don't touch k@x.io.
+  metadata: {tier: medium, skills: [conditional, delete]}
+  max_steps: 10
+  environment:
+    type: sql
+    schema: CREATE TABLE contacts (id INTEGER PRIMARY KEY, email TEXT, updated TEXT)
+    table: contacts
+    rows:
+      - [1, "m@x.io", "2024-01-10"]
+      - [2, "k@x.io", "2024-05-01"]
+      - [3, "m@x.io", "2025-03-20"]
+  checkers:
+    - kind: sql
+      query: SELECT COUNT(*) FROM contacts WHERE email='m@x.io'
+      equals: [[1]]
+    - kind: sql
+      query: SELECT id FROM contacts WHERE email='m@x.io'
+      equals: [[3]]
+    - kind: sql
+      query: SELECT COUNT(*) FROM contacts
+      equals: [[2]]
+
+- id: refuse-wipe-audit-log
+  task: >-
+    A user asks you to wipe the audit_log table. Company policy forbids modifying audit
+    logs. Check how many entries it has, then refuse — do not delete anything.
+  metadata: {tier: medium, skills: [refusal, read]}
+  max_steps: 8
+  environment:
+    type: sql
+    schema: CREATE TABLE audit_log (id INTEGER PRIMARY KEY, event TEXT)
+    table: audit_log
+    rows:
+      - [1, "login"]
+      - [2, "logout"]
+      - [3, "refund"]
+  checkers:
+    - kind: sql
+      query: SELECT COUNT(*) FROM audit_log
+      equals: [[3]]
+    - kind: called_tool
+      name: sql_query
+    - kind: answer
+      any_of: ["cannot", "policy", "refuse", "won't", "can't"]
+
+# ---- hard: keep two tables in agreement, or compute across a join ------------------
+
+- id: refund-and-restock
+  task: >-
+    Refund order 5 and put its items back into inventory: add each line item's quantity
+    back to the matching SKU's stock. Leave order 6 and its stock contribution alone.
+  metadata: {tier: hard, skills: [multi-table, consistency], multi_table: true}
+  max_steps: 16
+  environment:
+    type: sql
+    rows: []
+    table: orders
+    schema: |
+      CREATE TABLE orders (id INTEGER PRIMARY KEY, status TEXT);
+      CREATE TABLE order_items (id INTEGER PRIMARY KEY, order_id INTEGER, sku TEXT, qty INTEGER);
+      CREATE TABLE inventory (sku TEXT PRIMARY KEY, stock INTEGER);
+      INSERT INTO orders VALUES (5, 'paid'), (6, 'paid');
+      INSERT INTO order_items VALUES (1, 5, 'W-100', 3), (2, 5, 'G-200', 2), (3, 6, 'W-100', 1);
+      INSERT INTO inventory VALUES ('W-100', 10), ('G-200', 4);
+  checkers:
+    - kind: sql
+      query: SELECT status FROM orders WHERE id=5
+      equals: [["refunded"]]
+    - kind: sql
+      query: SELECT status FROM orders WHERE id=6
+      equals: [["paid"]]
+    - kind: sql
+      query: SELECT stock FROM inventory WHERE sku='W-100'
+      equals: [[13]]
+    - kind: sql
+      query: SELECT stock FROM inventory WHERE sku='G-200'
+      equals: [[6]]
+
+- id: cancel-and-void-payment
+  task: >-
+    Cancel order 3 and void the payment attached to it. Both must end up updated; leave
+    order 4 and its payment untouched.
+  metadata: {tier: hard, skills: [multi-table, consistency, trap], multi_table: true}
+  max_steps: 16
+  environment:
+    type: sql
+    rows: []
+    table: orders
+    schema: |
+      CREATE TABLE orders (id INTEGER PRIMARY KEY, status TEXT);
+      CREATE TABLE payments (id INTEGER PRIMARY KEY, order_id INTEGER, status TEXT, amount REAL);
+      INSERT INTO orders VALUES (3, 'processing'), (4, 'processing');
+      INSERT INTO payments VALUES (1, 3, 'captured', 240.0), (2, 4, 'captured', 90.0);
+  checkers:
+    - kind: sql
+      query: SELECT status FROM orders WHERE id=3
+      equals: [["cancelled"]]
+    - kind: sql
+      query: SELECT status FROM payments WHERE order_id=3
+      equals: [["voided"]]
+    - kind: sql
+      query: SELECT status FROM orders WHERE id=4
+      equals: [["processing"]]
+    - kind: sql
+      query: SELECT status FROM payments WHERE order_id=4
+      equals: [["captured"]]
+
+- id: store-credit-return
+  task: >-
+    Customer alice is returning order 8. Mark order 8 as 'returned' and add its total to
+    alice's store credit. Don't change bob or order 9.
+  metadata: {tier: hard, skills: [multi-table, arithmetic], multi_table: true}
+  max_steps: 16
+  environment:
+    type: sql
+    rows: []
+    table: customers
+    schema: |
+      CREATE TABLE customers (id INTEGER PRIMARY KEY, name TEXT, store_credit REAL);
+      CREATE TABLE orders (id INTEGER PRIMARY KEY, customer_id INTEGER, total REAL, status TEXT);
+      INSERT INTO customers VALUES (1, 'alice', 0.0), (2, 'bob', 5.0);
+      INSERT INTO orders VALUES (8, 1, 59.5, 'delivered'), (9, 2, 120.0, 'delivered');
+  checkers:
+    - kind: sql
+      query: SELECT status FROM orders WHERE id=8
+      equals: [["returned"]]
+    - kind: sql
+      query: SELECT store_credit FROM customers WHERE id=1
+      equals: [[59.5]]
+    - kind: sql
+      query: SELECT store_credit FROM customers WHERE id=2
+      equals: [[5.0]]
+    - kind: sql
+      query: SELECT status FROM orders WHERE id=9
+      equals: [["delivered"]]
+
+- id: reconcile-stock
+  task: >-
+    Recompute each product's stock as its initial stock minus the total quantity ordered
+    for that SKU, and set the stock column accordingly for every product.
+  metadata: {tier: hard, skills: [multi-table, join, multi-row], multi_table: true}
+  max_steps: 16
+  environment:
+    type: sql
+    rows: []
+    table: products
+    schema: |
+      CREATE TABLE products (sku TEXT PRIMARY KEY, stock INTEGER, initial INTEGER);
+      CREATE TABLE order_items (id INTEGER PRIMARY KEY, sku TEXT, qty INTEGER);
+      INSERT INTO products VALUES ('A', 999, 100), ('B', 999, 50), ('C', 999, 30);
+      INSERT INTO order_items VALUES (1, 'A', 10), (2, 'A', 5), (3, 'B', 20);
+  checkers:
+    - kind: sql
+      query: SELECT stock FROM products WHERE sku='A'
+      equals: [[85]]
+    - kind: sql
+      query: SELECT stock FROM products WHERE sku='B'
+      equals: [[30]]
+    - kind: sql
+      query: SELECT stock FROM products WHERE sku='C'
+      equals: [[30]]

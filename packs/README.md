@@ -7,7 +7,15 @@ that must pass 100% — which keeps the pack solvable and the leaderboard honest
 
 | Pack | Scenarios | World | Author |
 | --- | --- | --- | --- |
+| [`core_v2`](core_v2.yaml) | 14 | harder flagship: conditions, traps, multi-table consistency, tiered | agentsynth |
 | [`core_v1`](core_v1.yaml) | 10 | business ops over writable SQL | agentsynth |
+
+`core_v2` is the recommended flagship. It spans easy → hard tiers (in each
+scenario's `metadata`), and four scenarios keep **two tables in agreement** —
+refund-and-restock, cancel-and-void-payment, store-credit-return,
+reconcile-stock — where agents that mutate one table but forget the other fail.
+A careless single-step agent scores ~7%; the oracle scores 100%, so the
+leaderboard has room to discriminate.
 
 Live leaderboards: [agentsynth.tech/leaderboard](https://agentsynth.tech/leaderboard).
 

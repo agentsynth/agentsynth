@@ -96,11 +96,33 @@ class SQLEnvironment(Environment):
         self._seed()
 
     def _seed(self) -> None:
-        self._conn.execute(self._schema)
+        # A multi-statement schema (several tables, inline INSERTs) runs as a
+        # script; a single CREATE keeps the executemany seeding path.
+        body = self._schema.strip().rstrip(";").strip()
+        if ";" in body:
+            self._conn.executescript(self._schema)
+        else:
+            self._conn.execute(self._schema)
         if self._rows:
             placeholders = ",".join(["?"] * len(self._rows[0]))
             self._conn.executemany(f"INSERT INTO {self._table} VALUES ({placeholders})", self._rows)
-            self._conn.commit()
+        self._conn.commit()
+
+    def _table_summary(self) -> str:
+        """`orders(id, status); items(id, order_id)` — the live schema, for the tool."""
+        with self._lock:
+            names = [
+                r[0]
+                for r in self._conn.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table' "
+                    "AND name NOT LIKE 'sqlite_%' ORDER BY name"
+                ).fetchall()
+            ]
+            parts = []
+            for name in names:
+                cols = [r[1] for r in self._conn.execute(f"PRAGMA table_info({name})").fetchall()]
+                parts.append(f"{name}({', '.join(cols)})")
+        return "; ".join(parts)
 
     def reset(self) -> None:
         with self._lock:
@@ -117,15 +139,13 @@ class SQLEnvironment(Environment):
             return [tuple(r) for r in self._conn.execute(sql).fetchall()]
 
     def tools(self) -> List[ToolSpec]:
+        schema = self._table_summary()
         if self.read_only:
-            desc = (
-                "Run a read-only SQL SELECT against an analytics database. "
-                f"Table `{self._table}`(region, product, quarter, revenue, units)."
-            )
+            desc = f"Run a read-only SQL SELECT against an analytics database. Schema: {schema}."
         else:
             desc = (
-                "Run SQL (SELECT, INSERT, UPDATE, DELETE) against the task database. "
-                f"Main table: `{self._table}`."
+                "Run SQL (SELECT, INSERT, UPDATE, DELETE) against the task database, "
+                f"one statement per call. Schema: {schema}."
             )
         return [
             ToolSpec(
