@@ -6,6 +6,21 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.7.3] - 2026-06-12
+
+### Added
+
+- `core_v2` — the harder flagship pack (14 scenarios across easy/medium/hard
+  tiers): conditional logic, aggregation, traps you must not fall for, and four
+  multi-table scenarios that require keeping two tables in agreement (refund and
+  restock, cancel and void a payment, return for store credit, reconcile stock
+  from a join). A careless single-step agent scores ~7%, the oracle 100%, so the
+  board can discriminate.
+- `SQLEnvironment` accepts a multi-statement schema (several `CREATE TABLE`s plus
+  inline `INSERT`s run as a script), and a scenario's `max_steps` now reaches the
+  gym, so harder tasks get the room they need. The `sql_query` tool description
+  lists the live schema.
+
 ## [0.7.2] - 2026-06-12
 
 ### Added
