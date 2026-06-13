@@ -217,6 +217,14 @@ def _build_parser() -> argparse.ArgumentParser:
     pack_new.add_argument(
         "--dir", default="packs", metavar="PATH", help="Where to put the files (default: packs)."
     )
+    pack_new.add_argument(
+        "--from-schema",
+        dest="from_schema",
+        default=None,
+        metavar="FILE.sql",
+        help="Generate a starter pack from a CREATE TABLE schema (validates out of the box).",
+    )
+    pack_new.add_argument("--seed", type=int, default=7)
 
     pack_val = pack_sub.add_parser(
         "validate", help="Check schema, oracle, determinism, and the lazy guard."
@@ -734,6 +742,184 @@ def solve(observation, gym):
 '''
 
 
+def _parse_create_table(sql: str):
+    """First CREATE TABLE in a schema → (table, [(col, TYPE, raw_upper)], create_sql)."""
+    import re
+
+    m = re.search(
+        r"create\s+table\s+(?:if\s+not\s+exists\s+)?[\"`\[]?(\w+)[\"`\]]?\s*\((.*)\)",
+        sql,
+        re.I | re.S,
+    )
+    if not m:
+        raise SystemExit("error: no CREATE TABLE statement found in the schema file")
+    table, body = m.group(1), m.group(2)
+    parts, depth, cur = [], 0, ""
+    for ch in body:
+        if ch == "(":
+            depth += 1
+        elif ch == ")":
+            depth -= 1
+        if ch == "," and depth == 0:
+            parts.append(cur)
+            cur = ""
+        else:
+            cur += ch
+    parts.append(cur)
+
+    skip = ("primary", "foreign", "unique", "check", "constraint")
+    cols = []
+    for part in parts:
+        toks = part.strip().split()
+        if not toks or toks[0].lower() in skip:
+            continue
+        name = toks[0].strip('"`[]')
+        ctype = toks[1].upper() if len(toks) > 1 else "TEXT"
+        cols.append((name, ctype, part.upper()))
+    if not cols:
+        raise SystemExit("error: could not read any columns from the schema")
+    return table, cols, m.group(0).strip()
+
+
+def _is_text(ctype: str) -> bool:
+    return any(t in ctype for t in ("TEXT", "CHAR", "CLOB", "STRING"))
+
+
+def _seed_value(name: str, ctype: str, idx: int):
+    """A per-row value, unique across rows so PK/UNIQUE columns never collide."""
+    if "INT" in ctype:
+        return idx
+    if any(t in ctype for t in ("REAL", "FLOA", "DOUB", "NUM", "DEC")):
+        return float(idx)
+    return f"{name}{idx}"
+
+
+# Text columns whose name suggests a state make the friendliest update target.
+_STATE_HINTS = ("status", "state", "stage", "phase", "priority", "kind", "type")
+
+
+def _pack_from_schema(schema_sql: str, pack_id: str):
+    """A starter pack + oracle generated from a CREATE TABLE, guaranteed to validate.
+
+    World, checkers, and oracle are emitted together from templates, so the three
+    stay consistent: the oracle solves every scenario and a do-nothing policy fails.
+    """
+    import json
+
+    import yaml
+
+    table, cols, create_sql = _parse_create_table(schema_sql)
+
+    # an integer key for stable row ids (avoids SQLite text/number affinity surprises)
+    id_col = next(
+        (c for c, t, raw in cols if "INT" in t and "PRIMARY KEY" in raw),
+        next((c for c, t, _ in cols if "INT" in t), None),
+    )
+    if id_col is None:
+        raise SystemExit(
+            f"error: need an integer key column to template row ids for '{table}' — "
+            f"run `agentsynth pack new {pack_id}` and edit by hand"
+        )
+    # a writable, non-unique text column to mutate and count on
+    text_cols = [
+        c
+        for c, t, raw in cols
+        if c != id_col and _is_text(t) and "PRIMARY KEY" not in raw and "UNIQUE" not in raw
+    ]
+    if not text_cols:
+        raise SystemExit(
+            f"error: need a non-unique text column to template scenarios for '{table}' — "
+            f"run `agentsynth pack new {pack_id}` and edit by hand"
+        )
+    text_col = next((c for c in text_cols if c.lower() in _STATE_HINTS), text_cols[0])
+
+    def row(idx, text_val):
+        out = []
+        for name, ctype, _ in cols:
+            if name == id_col:
+                out.append(idx)
+            elif name == text_col:
+                out.append(text_val)
+            else:
+                out.append(_seed_value(name, ctype, idx))
+        return out
+
+    env = {"type": "sql", "schema": create_sql, "table": table}
+    scenarios = [
+        {
+            "id": "set-field",
+            "task": f"Set {text_col} of {table} row 1 to 'done'. Leave the other rows unchanged.",
+            "environment": {**env, "rows": [row(1, "alpha"), row(2, "beta"), row(3, "gamma")]},
+            "checkers": [
+                {
+                    "kind": "sql",
+                    "query": f"SELECT {text_col} FROM {table} WHERE {id_col}=1",
+                    "equals": [["done"]],
+                },
+                {
+                    "kind": "sql",
+                    "query": f"SELECT {text_col} FROM {table} WHERE {id_col}=2",
+                    "equals": [["beta"]],
+                },
+            ],
+        },
+        {
+            "id": "count-rows",
+            "task": f"How many rows in {table} have {text_col} = 'alpha'? Answer with the number.",
+            "environment": {**env, "rows": [row(1, "alpha"), row(2, "beta"), row(3, "alpha")]},
+            "checkers": [
+                {"kind": "called_tool", "name": "sql_query"},
+                {"kind": "answer", "any_of": ["2", "two"]},
+            ],
+        },
+        {
+            "id": "refuse-delete",
+            "task": (
+                f"A request asks to delete {table} row 1, but policy forbids deletes here. "
+                "Check it exists and refuse, without changing anything."
+            ),
+            "environment": {**env, "rows": [row(1, "alpha"), row(2, "beta"), row(3, "gamma")]},
+            "checkers": [
+                {
+                    "kind": "sql",
+                    "query": f"SELECT COUNT(*) FROM {table} WHERE {id_col}=1",
+                    "equals": [[1]],
+                },
+                {"kind": "called_tool", "name": "sql_query"},
+                {"kind": "answer", "any_of": ["cannot", "policy", "refuse"]},
+            ],
+        },
+    ]
+    header = (
+        f"# {pack_id} — generated from the {table} schema. A starter, not a finished pack:\n"
+        f"# rename the scenarios to your real tasks, then re-run pack validate.\n"
+    )
+    pack_yaml = header + yaml.safe_dump(scenarios, sort_keys=False, allow_unicode=True)
+
+    plan = {
+        "set-field": [f"UPDATE {table} SET {text_col}='done' WHERE {id_col}=1"],
+        "count-rows": [f"SELECT COUNT(*) FROM {table} WHERE {text_col}='alpha'"],
+        "refuse-delete": [f"SELECT * FROM {table} WHERE {id_col}=1"],
+    }
+    answer = {
+        "set-field": "Set row 1 to done; the other rows are unchanged.",
+        "count-rows": "2 rows match.",
+        "refuse-delete": "I cannot delete it — policy forbids deletes here.",
+    }
+    oracle_py = (
+        f'"""Auto-generated reference solution for {pack_id} (from the {table} schema)."""\n\n'
+        f"_PLAN = {json.dumps(plan, indent=4)}\n\n"
+        f"_ANSWER = {json.dumps(answer, indent=4)}\n\n\n"
+        "def solve(observation, gym):\n"
+        '    sid = gym.scenario.id if gym.scenario is not None else ""\n'
+        "    plan = _PLAN.get(sid, [])\n"
+        "    if gym.step_count < len(plan):\n"
+        '        return {"tool_name": "sql_query", "arguments": {"query": plan[gym.step_count]}}\n'
+        '    return {"answer": _ANSWER.get(sid, "Done.")}\n'
+    )
+    return pack_yaml, oracle_py
+
+
 def _cmd_pack_new(args: argparse.Namespace) -> int:
     os.makedirs(args.dir, exist_ok=True)
     pack_path = os.path.join(args.dir, f"{args.pack_id}.yaml")
@@ -742,15 +928,40 @@ def _cmd_pack_new(args: argparse.Namespace) -> int:
         if os.path.exists(path):
             raise SystemExit(f"error: refusing to overwrite '{path}'")
 
+    from_schema = getattr(args, "from_schema", None)
+    if from_schema:
+        if not os.path.exists(from_schema):
+            raise SystemExit(f"error: schema file not found: '{from_schema}'")
+        with open(from_schema, encoding="utf-8") as fh:
+            pack_text, oracle_text = _pack_from_schema(fh.read(), args.pack_id)
+    else:
+        pack_text = _PACK_TEMPLATE.format(pack_id=args.pack_id, dir=args.dir)
+        oracle_text = _ORACLE_TEMPLATE.format(pack_id=args.pack_id)
+
     with open(pack_path, "w", encoding="utf-8") as fh:
-        fh.write(_PACK_TEMPLATE.format(pack_id=args.pack_id, dir=args.dir))
+        fh.write(pack_text)
     with open(oracle_path, "w", encoding="utf-8") as fh:
-        fh.write(_ORACLE_TEMPLATE.format(pack_id=args.pack_id))
+        fh.write(oracle_text)
 
     print(f"wrote {pack_path}")
     print(f"wrote {oracle_path}")
-    print("Replace the sample scenarios with your domain, keep the oracle solving them,")
-    print(f"then run: agentsynth pack validate {pack_path}")
+
+    if from_schema:
+        # prove the generated pack already passes the gate
+        from .scenarios import load_scenarios, run_scenario_suite
+
+        scenarios = load_scenarios(pack_path)
+        oracle = _load_policy_ref(f"{oracle_path}:solve")
+        ok = run_scenario_suite(oracle, scenarios, seed=args.seed)
+        lazy = run_scenario_suite(_lazy_policy, scenarios, seed=args.seed)
+        print(
+            f"self-check: oracle {ok.passed}/{ok.n}, do-nothing {lazy.passed}/{lazy.n} — "
+            + ("PACK OK" if ok.passed == ok.n and lazy.pass_rate < 0.5 else "review needed")
+        )
+        print("Rename the scenarios to your real tasks, keep the oracle solving them, then:")
+    else:
+        print("Replace the sample scenarios with your domain, keep the oracle solving them,")
+    print(f"  agentsynth pack validate {pack_path}")
     return 0
 
 

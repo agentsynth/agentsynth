@@ -543,11 +543,21 @@ Packs are community-extensible — scaffold one for your domain and it gets its
 own live leaderboard once merged:
 
 ```bash
-agentsynth pack new my_domain_v1 --dir packs   # skeleton + oracle stub
+agentsynth pack new my_domain_v1 --dir packs              # skeleton + oracle stub
+agentsynth pack new my_domain_v1 --from-schema db.sql     # or generate from a CREATE TABLE
 agentsynth pack validate packs/my_domain_v1.yaml
 ```
 
-See [`packs/README.md`](packs/README.md) for the gates a pack must pass.
+`--from-schema` reads a `CREATE TABLE` and emits a starter pack — scenarios,
+checkers, and a working oracle — that passes the gate out of the box; rename the
+scenarios to your real tasks and re-validate. See [`packs/README.md`](packs/README.md)
+for the gates a pack must pass.
+
+Outcome checks **are** verifiable rewards: a pack scenario doubles as an RLVR
+environment. `AgentGym.from_scenario(scenario)` turns one into a gym whose
+terminal reward is the world-state verdict, `make_reward_fn` plugs it into TRL's
+`GRPOTrainer`, and `to_openenv` bridges it onto the OpenEnv standard — so the same
+packs you bench with also train against.
 
 ### Gate your CI on pass^k
 

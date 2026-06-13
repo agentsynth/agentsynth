@@ -16,9 +16,14 @@ Live leaderboards: [agentsynth.tech/leaderboard](https://agentsynth.tech/leaderb
 ```bash
 pip install agentsynth-ai
 agentsynth pack new my_domain_v1 --dir packs
+# or start from a real schema:  agentsynth pack new my_domain_v1 --from-schema db.sql
 # edit packs/my_domain_v1.yaml + packs/my_domain_v1_oracle.py
 agentsynth pack validate packs/my_domain_v1.yaml
 ```
+
+`--from-schema` reads the first `CREATE TABLE` (needs an integer key and a
+non-unique text column) and writes a three-scenario starter that already passes
+the gate — a fast way in from a database you already have.
 
 `validate` is the merge gate, and CI runs it on every PR:
 
