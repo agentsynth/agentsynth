@@ -6,6 +6,15 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.7.2] - 2026-06-12
+
+### Added
+
+- `agentsynth pack new --from-schema db.sql` generates a starter pack from a
+  `CREATE TABLE` — scenarios, checkers, and a working oracle, emitted together so
+  the pack passes the gate out of the box. A fast way in from a database you
+  already have; rename the scenarios and re-validate.
+
 ## [0.7.1] - 2026-06-12
 
 ### Added
