@@ -6,6 +6,16 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.7.4] - 2026-06-12
+
+### Changed
+
+- The playground demo (Agent runs and Compare tabs) and `agentsynth.demo` now run
+  on `core_v2` — the harder flagship with conditionals, traps, and multi-table
+  consistency. The expert clears it, a mutation-shy agent passes only the four
+  read-only scenarios, and the lazy talker scores zero. `core_v1` keeps its own
+  oracle (`examples/core_v1_oracle.py`), unchanged.
+
 ## [0.7.3] - 2026-06-12
 
 ### Added

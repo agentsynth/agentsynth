@@ -10,7 +10,7 @@ LLM-as-Judge loop. Runs offline against a mock by default.
 
 from __future__ import annotations
 
-__version__ = "0.7.3"
+__version__ = "0.7.4"
 
 from .adapters import action_from_openai_tool_call, to_openai_tools
 from .benchmarks import (
