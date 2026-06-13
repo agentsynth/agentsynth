@@ -306,6 +306,15 @@ def do_compare(policy_names: Optional[List[str]], model_choice: str, trials: flo
     )
 
 
+def _default_agent_view() -> str:
+    """A ready-made expert episode so the lead tab shows the thesis before any click."""
+    try:
+        first = next(iter(sorted(_DEMO_SCENARIOS)))
+        return do_agent_run(first, next(iter(DEMO_POLICIES)), MOCK_LABEL)
+    except Exception:
+        return "_Pick a scenario and policy, then run the episode._"
+
+
 def _verdict_card(ev: Any) -> str:
     """The judge verdict as a scorecard: overall, pass badge, one bar per dimension."""
     badge = (
@@ -767,11 +776,18 @@ def do_preview(trajectories: Optional[List[Any]]):
 
 
 _INTRO_MD = """\
-Generate synthetic multi-step agent trajectories, judge them on a six-dimension
-rubric, inspect the dataset, and export it for fine-tuning. **Offline by
-default** — no keys needed; set a provider key (`ANTHROPIC_API_KEY`,
-`OPENAI_API_KEY`, …) as a Space secret to switch on a real LLM.
+Watch agents work **outcome-checked** worlds — a run passes only when the database,
+API, or sandbox ends in the goal state, so an agent can't talk its way to a score.
+Compare policies on a pack, then generate, judge, and export trajectories for
+fine-tuning. **Offline by default** — no keys needed; set a provider key
+(`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, …) as an environment variable / Space
+secret to switch on a real LLM.
 """
+
+_FUNNEL_MD = (
+    "**Put your own model on the [live leaderboard](https://agentsynth.tech/leaderboard):** "
+    "`pip install agentsynth-ai && agentsynth bench --pack core_v1 --model <id> --submit`"
+)
 
 _RUBRIC_MD = """\
 Every trajectory gets a score in **[0, 1]** per dimension, combined into a
@@ -968,6 +984,71 @@ with gr.Blocks(title="AgentSynth — playground", **_BLOCKS_KW) as demo:
         js="() => document.body.classList.contains('dark')",
     )
 
+    with gr.Tab("Agent runs"):
+        gr.Markdown(
+            "**Watch an agent work an outcome-checked world.** A run passes only when "
+            "the world ends in the goal state — the lazy talker scores zero, the expert "
+            "earns it. Scripted policies run offline; pick the LLM policy plus a model "
+            "id to watch a real model try."
+        )
+        with gr.Row():
+            agent_scenario = gr.Dropdown(
+                choices=sorted(_DEMO_SCENARIOS),
+                value=next(iter(sorted(_DEMO_SCENARIOS)), None),
+                label="Scenario (core_v1)",
+                scale=2,
+            )
+            agent_policy = gr.Dropdown(
+                choices=list(DEMO_POLICIES) + [_LLM_POLICY_LABEL],
+                value=next(iter(DEMO_POLICIES)),
+                label="Policy",
+                scale=2,
+            )
+            agent_model = gr.Dropdown(
+                choices=_MODEL_CHOICES,
+                value=MOCK_LABEL,
+                label="Model (LLM policy only)",
+                allow_custom_value=True,
+                scale=2,
+            )
+        agent_task = gr.Markdown(do_agent_task(next(iter(sorted(_DEMO_SCENARIOS)), "")))
+        agent_btn = gr.Button("Run the episode", variant="primary", elem_id="agent-btn")
+        agent_view = gr.Markdown(_default_agent_view())
+        gr.Markdown(_FUNNEL_MD)
+
+        agent_scenario.change(do_agent_task, inputs=[agent_scenario], outputs=[agent_task])
+        agent_btn.click(
+            do_agent_run,
+            inputs=[agent_scenario, agent_policy, agent_model],
+            outputs=[agent_view],
+        )
+
+    with gr.Tab("Compare"):
+        gr.Markdown(
+            "Line policies up against the whole pack — the CLI's `bench --compare`, "
+            "in the browser. Two trials by default, so flaky wins don't count."
+        )
+        with gr.Row():
+            cmp_policies = gr.CheckboxGroup(
+                choices=list(DEMO_POLICIES),
+                value=list(DEMO_POLICIES),
+                label="Scripted policies",
+                scale=3,
+            )
+            cmp_model = gr.Dropdown(
+                choices=_MODEL_CHOICES,
+                value=MOCK_LABEL,
+                label="Add an LLM (optional)",
+                allow_custom_value=True,
+                scale=2,
+            )
+            cmp_trials = gr.Slider(1, 3, value=2, step=1, label="Trials (pass^k)", scale=1)
+        cmp_btn = gr.Button("Run the comparison", variant="primary", elem_id="cmp-btn")
+        cmp_view = gr.Markdown("_Pick at least two policies, then run._")
+        gr.Markdown(_FUNNEL_MD)
+
+        cmp_btn.click(do_compare, inputs=[cmp_policies, cmp_model, cmp_trials], outputs=[cmp_view])
+
     with gr.Tab("Generate"):
         with gr.Row(equal_height=True):
             with gr.Column(scale=7):
@@ -1093,67 +1174,6 @@ with gr.Blocks(title="AgentSynth — playground", **_BLOCKS_KW) as demo:
             inputs=[traj_state, eval_state, ov_mode, ov_min_score],
             outputs=[gen_overview],
         )
-
-    with gr.Tab("Agent runs"):
-        gr.Markdown(
-            "Watch a policy work an outcome-checked world. The scripted agents run "
-            "offline; pick the LLM policy plus a model id to watch a real model try."
-        )
-        with gr.Row():
-            agent_scenario = gr.Dropdown(
-                choices=sorted(_DEMO_SCENARIOS),
-                value=next(iter(sorted(_DEMO_SCENARIOS)), None),
-                label="Scenario (core_v1)",
-                scale=2,
-            )
-            agent_policy = gr.Dropdown(
-                choices=list(DEMO_POLICIES) + [_LLM_POLICY_LABEL],
-                value=next(iter(DEMO_POLICIES)),
-                label="Policy",
-                scale=2,
-            )
-            agent_model = gr.Dropdown(
-                choices=_MODEL_CHOICES,
-                value=MOCK_LABEL,
-                label="Model (LLM policy only)",
-                allow_custom_value=True,
-                scale=2,
-            )
-        agent_task = gr.Markdown(do_agent_task(next(iter(sorted(_DEMO_SCENARIOS)), "")))
-        agent_btn = gr.Button("Run the episode", variant="primary", elem_id="agent-btn")
-        agent_view = gr.Markdown("_Pick a scenario and policy, then run the episode._")
-
-        agent_scenario.change(do_agent_task, inputs=[agent_scenario], outputs=[agent_task])
-        agent_btn.click(
-            do_agent_run,
-            inputs=[agent_scenario, agent_policy, agent_model],
-            outputs=[agent_view],
-        )
-
-    with gr.Tab("Compare"):
-        gr.Markdown(
-            "Line policies up against the whole pack — the CLI's `bench --compare`, "
-            "in the browser. Two trials by default, so flaky wins don't count."
-        )
-        with gr.Row():
-            cmp_policies = gr.CheckboxGroup(
-                choices=list(DEMO_POLICIES),
-                value=list(DEMO_POLICIES),
-                label="Scripted policies",
-                scale=3,
-            )
-            cmp_model = gr.Dropdown(
-                choices=_MODEL_CHOICES,
-                value=MOCK_LABEL,
-                label="Add an LLM (optional)",
-                allow_custom_value=True,
-                scale=2,
-            )
-            cmp_trials = gr.Slider(1, 3, value=2, step=1, label="Trials (pass^k)", scale=1)
-        cmp_btn = gr.Button("Run the comparison", variant="primary", elem_id="cmp-btn")
-        cmp_view = gr.Markdown("_Pick at least two policies, then run._")
-
-        cmp_btn.click(do_compare, inputs=[cmp_policies, cmp_model, cmp_trials], outputs=[cmp_view])
 
     with gr.Tab("Evaluate"):
         with gr.Row():
