@@ -80,16 +80,18 @@ def test_render_detail_with_and_without_eval(batch):
 
 
 def test_agent_run_renders_outcome_and_timeline():
-    out = app.do_agent_run("refund-order", "expert (inspect-act-verify)", "mock (offline)")
+    sid = next(iter(sorted(app._DEMO_SCENARIOS)))  # whatever the demo pack leads with
+    out = app.do_agent_run(sid, "expert (inspect-act-verify)", "mock (offline)")
     assert "Outcome checks" in out and "PASS" in out
     assert 'class="traj"' in out  # the episode timeline renders below the card
 
-    lazy = app.do_agent_run("refund-order", "lazy (just talks)", "mock (offline)")
+    lazy = app.do_agent_run(sid, "lazy (just talks)", "mock (offline)")
     assert "FAIL" in lazy and "✗" in lazy
 
 
 def test_agent_run_guards_the_llm_policy():
-    out = app.do_agent_run("refund-order", app._LLM_POLICY_LABEL, "mock (offline)")
+    sid = next(iter(sorted(app._DEMO_SCENARIOS)))
+    out = app.do_agent_run(sid, app._LLM_POLICY_LABEL, "mock (offline)")
     assert "needs a model id" in out
 
 
@@ -97,7 +99,7 @@ def test_compare_tab_builds_the_pass_k_table():
     out = app.do_compare(list(app.DEMO_POLICIES), "mock (offline)", 2)
     assert "pass^2" in out and "pass^1 avg" in out
     assert "✓" in out and "✗" in out
-    assert "100%" in out and "20%" in out and "0%" in out
+    assert "100%" in out and "0%" in out  # expert clears it, lazy holds at zero
 
 
 def test_compare_tab_needs_two_items():

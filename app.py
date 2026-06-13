@@ -786,7 +786,7 @@ secret to switch on a real LLM.
 
 _FUNNEL_MD = (
     "**Put your own model on the [live leaderboard](https://agentsynth.tech/leaderboard):** "
-    "`pip install agentsynth-ai && agentsynth bench --pack core_v1 --model <id> --submit`"
+    "`pip install agentsynth-ai && agentsynth bench --pack core_v2 --model <id> --submit`"
 )
 
 _RUBRIC_MD = """\
@@ -995,7 +995,7 @@ with gr.Blocks(title="AgentSynth — playground", **_BLOCKS_KW) as demo:
             agent_scenario = gr.Dropdown(
                 choices=sorted(_DEMO_SCENARIOS),
                 value=next(iter(sorted(_DEMO_SCENARIOS)), None),
-                label="Scenario (core_v1)",
+                label="Scenario (core_v2)",
                 scale=2,
             )
             agent_policy = gr.Dropdown(

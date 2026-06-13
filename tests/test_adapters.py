@@ -47,7 +47,7 @@ def test_tool_call_parsing_dict_object_and_malformed():
 
 
 def test_external_loop_drives_a_scenario_to_a_verdict():
-    scenario = next(s for s in demo_scenarios() if s.id == "refund-order")
+    scenario = next(s for s in demo_scenarios() if s.id == "refund-if-eligible")
     gym = AgentGym.from_scenario(scenario, seed=7)
     try:
         task = gym.reset()
@@ -75,7 +75,7 @@ def test_external_loop_drives_a_scenario_to_a_verdict():
 
 
 def test_external_loop_cannot_fake_the_outcome():
-    scenario = next(s for s in demo_scenarios() if s.id == "refund-order")
+    scenario = next(s for s in demo_scenarios() if s.id == "refund-if-eligible")
     gym = AgentGym.from_scenario(scenario, seed=7)
     try:
         gym.reset()
