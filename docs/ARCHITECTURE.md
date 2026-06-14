@@ -18,6 +18,19 @@ flowchart LR
     X --> O[(JSONL / ShareGPT / ADP / Parquet)]
 ```
 
+A scenario adds a second flow — verify against the world, then bench and gate on it:
+
+```mermaid
+flowchart LR
+    S[Scenario<br/>seeded world + checkers] --> GY[AgentGym]
+    P[policy / model / your loop] --> GY
+    GY --> V{world-state<br/>verdict}
+    V -->|reward| RL[RL training / GRPO]
+    V -->|pass^k| B[agentsynth bench]
+    B --> LB[(Scenario Hub<br/>leaderboard)]
+    B --> CI[CI gate / GitHub Action]
+```
+
 ## Modules
 
 | Module | Responsibility |
@@ -26,16 +39,28 @@ flowchart LR
 | `utils.py` | Tool-catalog parsing, the `PythonREPL` that grounds code steps, and `LLMClient` — a thin LiteLLM wrapper that reports `available` and degrades to a no-op offline. |
 | `generator.py` | `AgentTrajectoryGenerator`. Deterministic mock builders per mode, plus an LLM path that asks for a structured trajectory and falls back to mock on any failure. |
 | `evaluator.py` | `TrajectoryEvaluator`. Structural per-dimension scoring for the offline judge; an LLM judge that returns rubric JSON, falling back to structural. |
-| `metrics.py` | Dataset aggregates (`compute_dataset_metrics`, `diversity_score`) and the Plotly figures. |
-| `exporters.py` | `to_jsonl` / `load_jsonl` (round-trippable), `to_sharegpt`, `to_adp`, `to_parquet`, `save_dataset`. |
-| `environments/` | Pluggable backends that run tool calls for real: `SQLEnvironment` (in-memory SQLite), `PythonSandbox` (isolated subprocess), `MCPEnvironment` (any MCP server), `BrowserEnvironment` (headless Chromium via Playwright), `RestEnvironment` (any OpenAPI spec over plain HTTP), and `CompositeEnvironment`. Optional — without one, observations are templated. |
+| `scenarios.py` | Outcome-checked tasks: a `Scenario` bundles a seeded world, a goal, and checkers (`SqlCheck`, `HttpCheck`, `CalledTool`, `AnswerContains`). `run_scenario_suite` turns a pack into an outcome pass-rate; `load_scenarios` / `save_scenarios` (de)serialize YAML packs. |
+| `rl/` | `AgentGym` wraps a scenario as a gym episode whose terminal reward is the world-state verdict; `make_reward_fn` plugs it into TRL's `GRPOTrainer`, and `to_openenv` bridges onto the OpenEnv standard. |
+| `adapters.py` | Bridge an OpenAI-style agent to a gym: `to_openai_tools` emits function-calling schemas, `action_from_openai_tool_call` converts a tool call back into a gym action. Bring your own loop, no rewrite. |
+| `verification/` | Verifiers that confirm a trajectory is sound (`ExecutionVerifier` re-runs code and checks the output reproduces; tool-arg and safety checks), an `EnsembleEvaluator`, a `LearnedVerifier` distilled from the judge, and rubric presets. |
+| `benchmarks/` | A function-calling benchmark (`run_benchmark`, `compare_models`, `BUILTIN_CASES`) with before/after tables, plus BFCL / τ-bench adapters. |
+| `environments/` | Pluggable backends that run tool calls for real: `SQLEnvironment` (in-memory SQLite), `PythonSandbox` (isolated subprocess), `DockerSandbox` (container-isolated code), `MCPEnvironment` (any MCP server), `BrowserEnvironment` (headless Chromium via Playwright), `RestEnvironment` (any OpenAPI spec over plain HTTP), and `CompositeEnvironment`. Optional — without one, observations are templated. |
 | `tasks/` | A seed-task taxonomy across domains with a deterministic sampler, for diverse batches. |
 | `pipelines/` | `Recipe` (loadable from YAML) and `run_recipe` — generate (optionally concurrent), dedup, evaluate, verify, compute metrics, export, in one call. |
-| `verification/` | Verifiers that confirm a trajectory is sound (`ExecutionVerifier` re-runs code and checks the output reproduces; tool-arg and safety checks), an `EnsembleEvaluator`, and rubric presets. |
+| `importers.py` | Turn external logs into `Trajectory` objects — OpenAI / Anthropic `tool_use` and OpenTelemetry GenAI spans — plus `redact_text` / `redact_trajectory` to strip secrets before sharing. |
+| `mining.py` | Failure mining: categorize benchmark and judge misses (`mine_failures`, `mine_judge_failures`) and turn them into a focused next run (`recipe_from_failures`). |
+| `evolve.py` | `evolve_queries` — template or LLM-paraphrase expansion of a query set into harder variants. |
 | `preferences.py` | Build chosen/rejected pairs from scored trajectories and export DPO JSONL. |
-| `dedup.py` | Jaccard-shingle near-duplicate removal and benchmark decontamination. |
-| `cli.py` | The `agentsynth generate` / `agentsynth eval` console script. |
-| `app.py` (repo root) | The Gradio UI. The only module that imports Gradio at the top. Importing it builds `demo` without calling an LLM. |
+| `training/` | Trainer-ready dataset prep: `build_sft_dataset` / `build_dpo_dataset` and the record converters. |
+| `metrics.py` | Dataset aggregates (`compute_dataset_metrics`, `diversity_score`) and the Plotly figures. |
+| `exporters.py` | `to_jsonl` / `load_jsonl` (round-trippable), `to_sharegpt`, `to_adp`, `to_parquet`, `save_dataset`. |
+| `dedup.py` | Jaccard-shingle and MinHash near-duplicate removal, and benchmark decontamination. |
+| `scale.py` | Run generation like a job: `CachingLLMClient`, a `CostMeter` with a hard `BudgetExceeded` cap, and `run_resumable` checkpoints. |
+| `hub.py` | Push a dataset to the Hugging Face Hub with an auto-generated card (`push_dataset`, `dataset_card`). |
+| `demo.py` | The reference policies (`expert` / `read_only` / `lazy`) and the pack the playground runs. |
+| `cli.py` | The `agentsynth` console script: `generate`, `eval`, `import`, `flywheel`, `bench` (pass^k / compare / submit), and `pack` (new / validate / teach). |
+| `app.py` (repo root) | The Gradio playground. The only module that imports Gradio at the top. Importing it builds `demo` without calling an LLM. |
+| `hub/` (repo root) | The Scenario Hub: a FastAPI service that stores packs and submissions and serves the live leaderboard. |
 
 ## Design decisions
 
@@ -60,7 +85,11 @@ scores; the overall is a weighted mean you can re-weight.
 ## Extension points (today and planned)
 
 - New tools: pass any JSON-Schema / OpenAI-style catalog to `parse_tool_catalog`.
+- New scenario pack: `agentsynth pack new` scaffolds one — with an oracle and the
+  validation gate — for a domain you know. See `packs/README.md`.
+- Bring your own agent loop: drive any gym from an OpenAI-style agent via
+  `to_openai_tools` / `action_from_openai_tool_call`.
+- New environment: subclass `Environment` and register it in `make_environment`.
 - New export format: add a function in `exporters.py` and wire it into `save_dataset`.
 - New rubric weighting: pass `weights=` to `TrajectoryEvaluator`.
-- Planned: pluggable execution environments and verifiers, and an MCP tool source.
-  See `ROADMAP.md`.
+- See `ROADMAP.md` for what's planned.

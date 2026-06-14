@@ -5,23 +5,46 @@ scope will shift as we learn. If something here matters to you, open an issue or
 Discussion; the items marked **good first issue** are a nice way in.
 
 The north star: **the number of high-quality, verified agent trajectories people
-generate with this, and the number of models that get measurably better because of
-them.** Everything below serves that.
+generate with this, the number of models that get measurably better because of them,
+and the number of agents kept honest by a pack on the leaderboard.** Everything below
+serves that.
 
-## Where we are (v0.3.0)
+## Where we are (v0.7.4)
 
-The engine works offline end to end, and the proof is public:
+The engine works offline end to end, the benchmark is live, and the proof is public:
 
 - [x] Three generation modes: single-agent tool use, multi-agent, grounded code execution
 - [x] LLM-as-Judge eval loop over a six-dimension rubric, with a deterministic fallback
-- [x] Real environments: SQLite, Python sandbox, any MCP server, a headless browser
+- [x] **Outcome verification** — scenarios assert the world's end state (SQL / HTTP / tool-call / answer), not the transcript
+- [x] **Scenario packs + a live leaderboard** — `core_v1` (10 tasks) and `core_v2` (14, multi-table) on the [leaderboard](https://agentsynth.tech/leaderboard), served by the Scenario Hub
+- [x] **`agentsynth bench`** — pass^k reliability (`--trials`), side-by-side `--compare`, `--json` reports, one-command `--submit`
+- [x] **CI-for-agents** — a GitHub Action (`action.yml`) that fails a PR when pass^k drops below a floor
+- [x] **Bring your own loop** — drive any scenario from an OpenAI-style agent via `to_openai_tools` / `action_from_openai_tool_call`
+- [x] Seven real environments: SQLite, Python sandbox, Docker, any MCP server, a headless browser, any OpenAPI/REST spec, and composite
 - [x] Verification (re-run code, tool args, safety) + a learned verifier distilled from the judge
+- [x] RL-native: every scenario is a gym with verified rewards, a TRL-compatible reward fn, and an OpenEnv bridge
+- [x] Trace importers (OpenAI / Anthropic / OpenTelemetry) with secret redaction (`--redact`)
 - [x] A published dataset ([agentsynth-trajectories](https://huggingface.co/datasets/agentsynth/agentsynth-trajectories))
       and a reproducible before/after fine-tune ([docs/BENCHMARK.md](docs/BENCHMARK.md))
 - [x] Dataset metrics + dashboards, batch explorer in the app, JSONL/ShareGPT/ADP/Parquet export
-- [x] Gradio app + HF Space, CLI, offline test suite, CI + coverage
+- [x] Gradio playground + HF Space, CLI, offline test suite, CI + coverage
 
 Mock generation is the default; a provider key switches on real-LLM generation.
+
+## Benchmarks, packs & the leaderboard
+
+The flagship surface: outcome-checked packs, a public leaderboard, and a CI gate.
+
+- [x] `core_v1` (10 single-table tasks) and `core_v2` (14 tiered, including multi-table consistency)
+- [x] The Scenario Hub (FastAPI) with per-model / per-scenario breakdowns and a live leaderboard
+- [x] `agentsynth bench` with pass^k (`--trials`), `--compare`, `--json`, and `--submit`
+- [x] Pack authoring + a quality gate: `pack new` (incl. `--from-schema`), `pack validate`, `pack teach`
+- [x] A GitHub Action that gates CI on a pack's pass^k (`action.yml`)
+- [x] Bring-your-own-loop adapters (OpenAI tool schemas ⇄ gym actions)
+- [ ] A community **pack registry** — domain packs (support, finance, devops, data), each with its own board
+- [ ] A public "hardest unsolved scenarios" view to point contributors at the gaps
+- [ ] Signed / attested submissions so the leaderboard resists gaming
+- [ ] **pack wanted:** contribute an outcome-checked pack for a domain you know
 
 ## Real generation
 

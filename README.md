@@ -1,6 +1,6 @@
 # AgentSynth
 
-> Synthetic agentic trajectories with a built-in LLM-as-Judge eval loop. Generate tool-use, code-execution, and multi-agent training data offline, then score it.
+> Generate synthetic agent trajectories, **verify them against the world's end state**, and turn outcome-checked packs into a live leaderboard, RL rewards, and a CI gate for your agents. Offline-first, MIT-licensed.
 
 <p align="center">
   <a href="https://github.com/agentsynth/agentsynth/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/agentsynth/agentsynth/actions/workflows/ci.yml/badge.svg"></a>
@@ -28,38 +28,37 @@
 
 ## What it is
 
-AgentSynth generates multi-turn agent trajectories — tool-use, grounded code-execution, and multi-agent collaboration traces — and scores each one with an LLM-as-Judge eval loop. The output is training data for fine-tuning agentic LLMs, built without harvesting real conversations.
+Most synthetic agent data is graded on vibes. **AgentSynth grades on outcomes:** a run passes only when the database, API, or sandbox actually ends in the goal state — so an agent can't talk its way to a score, and the reward can't be farmed.
 
-What it's good for:
+Two layers sit on that idea:
 
-- Bootstrapping an agentic dataset when you have no production traffic, or can't use what you have.
-- Running entirely offline. Mock generation and evaluation are deterministic and need no API keys or network access.
-- Swapping in a real LLM when you want richer generation and a sharper judge. Claude, Grok, Groq, and OpenAI are all supported through [LiteLLM](https://github.com/BerriAI/litellm).
-- Filtering before you train. An 8-metric rubric scores every trajectory, so you can keep the high-signal subset and drop the rest.
-- Exporting straight into a training pipeline: JSONL, ShareGPT, and ADP formats load into Hugging Face / TRL / Unsloth / Axolotl without conversion.
+- **Generate + judge.** Produce multi-turn trajectories — tool-use, grounded code execution, multi-agent — and score each with a six-dimension LLM-as-Judge loop. Runs fully offline against a deterministic mock; a provider key (Claude, OpenAI, Groq, … via [LiteLLM](https://github.com/BerriAI/litellm)) switches on a real LLM.
+- **Verify against the world.** Bundle a task, a seeded world, and outcome checkers into a **scenario pack**, then bench any model — or your own agent loop — against it. Packs power a [live leaderboard](https://agentsynth.tech/leaderboard), double as RL environments with verifiable rewards, and drop into CI as a `pass^k` regression gate.
 
-Runs are reproducible. Any randomness in the mock paths comes from a stable hash seed, so identical inputs produce identical trajectories.
+What you get out: training data (JSONL / ShareGPT / ADP) for fine-tuning, a reproducible benchmark for picking models, and a way to keep agents from regressing. Mock paths are seeded, so identical inputs produce identical trajectories.
 
 ---
 
 ## Live demo
 
-Try it in the browser: [AgentSynth on Hugging Face Spaces](https://huggingface.co/spaces/agentsynth/agentsynth).
+Try it in the browser, no signup: the **[playground](https://app.agentsynth.tech)** (mirrored on the [Hugging Face Space](https://huggingface.co/spaces/agentsynth/agentsynth)).
 
-Generate a trajectory, watch the judge score it across the rubric dimensions, then export the dataset — all from the Gradio UI.
+Watch a policy work an outcome-checked world step by step, line policies up on a pack with a `pass^k` table, or generate and judge a batch and export the dataset. The [live leaderboard](https://agentsynth.tech/leaderboard) and docs are at [agentsynth.tech](https://agentsynth.tech).
 
 ---
 
 ## Features
 
-Core capabilities:
-
-- Synthetic trajectory generation in single-agent, multi-agent, and code-execution modes.
-- An LLM-as-Judge eval loop built on a weighted 6-dimension rubric, with a deterministic mock fallback.
-- Dataset metrics: aggregate pass@1, per-dimension averages, and trajectory diversity.
-- Export to JSONL, ShareGPT, or ADP in a single call.
-
-The eval loop scores six per-trajectory dimensions — task completion, tool correctness, trajectory faithfulness, reasoning coherence / plan adherence, efficiency, and safety — plus two dataset-level metrics, overall pass@1 and diversity.
+- **Outcome verification** — checkers assert on the world's end state (SQL rows, API responses, sandbox output), not the transcript. No grounding, no credit.
+- **Scenario packs + a live leaderboard** — `core_v2` ships 14 tiered, outcome-checked tasks (including multi-table consistency); `agentsynth bench --pack core_v2 --model <id> --submit` puts any model on the board. Scaffold your own with `agentsynth pack new`.
+- **`pass^k` reliability** — `--trials k` scores a pack k times and counts a scenario only when every trial passes, the flakiness single-shot benchmarks hide.
+- **A CI gate for agents** — the repo doubles as a GitHub Action that fails a PR when the pass rate drops below a floor.
+- **Generate + a 6-dimension judge** — single-agent, multi-agent, and code-execution modes, scored on task completion, tool correctness, faithfulness, reasoning, efficiency, and safety, with a deterministic mock fallback.
+- **7 real environments** — SQL, Python sandbox, Docker, MCP, headless browser, REST/OpenAPI, and Composite. Tool calls execute for real.
+- **RL-native (RLVR)** — any scenario is a gym whose terminal reward is the world-state verdict, with a TRL `GRPOTrainer`-compatible reward function and an OpenEnv bridge.
+- **Bring your own loop** — `to_openai_tools` / `action_from_openai_tool_call` drive the gym straight from an OpenAI-style agent (OpenAI SDK, LangGraph, CrewAI) with no rewrite.
+- **Import production traces** — OpenAI / Anthropic / OpenTelemetry logs become verifiable trajectories; `--redact` strips secrets first.
+- **Industrial scale** — disk cache, a hard budget cap, resumable runs, MinHash dedup, and JSONL / ShareGPT / ADP export.
 
 ---
 
@@ -491,13 +490,17 @@ with an outcome pass-rate. See [`examples/scenario_outcome.py`](examples/scenari
 
 ### Bench a model, get on the leaderboard
 
-`core_v1` is ten outcome-checked business tasks over a writable SQL world, with a
-live leaderboard at [api.agentsynth.tech/leaderboard](https://api.agentsynth.tech/leaderboard).
-Pack names resolve against `packs/` locally and fall back to the hub, so a bare
+`core_v2` is the flagship pack: 14 tiered, outcome-checked business tasks over a
+writable SQL world — from single-row updates to **multi-table consistency** (refund
+*and* restock, void *and* cancel) that punish an agent for changing one table and
+forgetting the other. It's tuned so the board won't saturate — the oracle scores
+100%, a careless model ~7%, a do-nothing policy 0%. Live at
+[agentsynth.tech/leaderboard](https://agentsynth.tech/leaderboard). Pack names
+resolve against `packs/` locally and fall back to the hub, so a bare
 `pip install agentsynth-ai` is enough:
 
 ```bash
-agentsynth bench --pack core_v1 --model claude-haiku-4-5-20251001 --submit
+agentsynth bench --pack core_v2 --model claude-haiku-4-5-20251001 --submit
 ```
 
 `--policy mypkg.module:fn` benches your own agent loop instead of a LiteLLM model;
@@ -505,10 +508,11 @@ agentsynth bench --pack core_v1 --model claude-haiku-4-5-20251001 --submit
 `--trials 4` runs the pack four times and scores **pass^k** — a scenario counts
 only when every trial passes, the reliability number single-shot benchmarks hide.
 `--compare "gpt-4o-mini,my_agent.py:solve"` runs models and your own loops side
-by side in one table.
-[`examples/core_v1_oracle.py`](examples/core_v1_oracle.py) is the reference
-solution — it inspects, acts, then verifies, and `agentsynth pack teach` exports
-its episodes as gold trajectories for SFT seeding.
+by side in one table. `core_v1` (10 single-table tasks) is still there as a
+gentler starter.
+[`packs/core_v2_oracle.py`](packs/core_v2_oracle.py) is the reference solution —
+it inspects, acts, then verifies, and `agentsynth pack teach` exports its episodes
+as gold trajectories for SFT seeding.
 
 ### Bring your own agent loop
 
@@ -519,7 +523,7 @@ CrewAI), don't rewrite it as a policy — drive the world directly:
 from agentsynth import AgentGym, to_openai_tools, action_from_openai_tool_call
 from agentsynth.scenarios import load_scenarios
 
-scenario = load_scenarios("packs/core_v1.yaml")[0]
+scenario = load_scenarios("packs/core_v2.yaml")[0]
 gym = AgentGym.from_scenario(scenario, seed=7)
 task = gym.reset()
 tools = to_openai_tools(gym)               # OpenAI function-calling schemas
@@ -719,27 +723,35 @@ print("dataset diversity:", diversity_score(trajectories))
 AgentSynth/
 ├── agentsynth/
 │   ├── schemas.py          # Pydantic models (Trajectory, ToolSpec, EvalResult, …)
-│   ├── utils.py            # tool-catalog parsing, PythonREPL, LLMClient (LiteLLM)
 │   ├── generator.py        # AgentTrajectoryGenerator (mock + LLM-backed)
-│   ├── evaluator.py        # TrajectoryEvaluator — LLM-as-Judge eval loop
-│   ├── metrics.py          # dataset metrics + Plotly dashboards
-│   ├── exporters.py        # JSONL / ShareGPT / ADP / Parquet
-│   ├── preferences.py      # DPO preference pairs
-│   ├── dedup.py            # near-duplicate removal + decontamination
-│   ├── hub.py              # push datasets to the Hugging Face Hub
-│   ├── cli.py              # the `agentsynth` CLI
-│   ├── environments/       # SQL, Python, MCP, browser, composite — run tool calls for real
-│   ├── tasks/              # seed-task taxonomy
+│   ├── evaluator.py        # TrajectoryEvaluator — the LLM-as-Judge eval loop
+│   ├── scenarios.py        # outcome-checked scenarios + packs (SqlCheck, HttpCheck, …)
+│   ├── demo.py             # the policies + pack the playground runs
+│   ├── adapters.py         # OpenAI-tool ⇄ gym-action bridges (bring your own loop)
+│   ├── importers.py        # OpenAI / Anthropic / OTel traces → trajectories (+ redaction)
+│   ├── mining.py           # failure mining → next-run recipe (the flywheel)
+│   ├── scale.py            # caching, budget caps, resumable runs
+│   ├── evolve.py           # query evolution for harder variants
+│   ├── cli.py              # the `agentsynth` CLI (generate · eval · import · flywheel · bench · pack)
+│   ├── environments/       # SQL · Python · Docker · MCP · browser · REST · composite
+│   ├── rl/                 # AgentGym, verified reward fns, OpenEnv bridge (RLVR)
+│   ├── verification/       # verifiers, judge ensemble, learned verifier, rubric presets
 │   ├── pipelines/          # Recipe + run_recipe (generate → verify → export)
-│   ├── verification/       # verifiers, judge ensemble, rubric presets
 │   ├── benchmarks/         # function-calling benchmark + before/after reporting
-│   └── training/           # SFT / DPO dataset builders
-├── app.py                  # Gradio web UI (Hugging Face Space entrypoint)
-├── scripts/                # make_dataset / train_sft / train_dpo / run_benchmark
-├── examples/               # sample datasets + a demo MCP server
-├── docs/                   # VISION, ARCHITECTURE, BENCHMARK, MANIFESTO
+│   ├── training/           # SFT / DPO dataset builders
+│   ├── tasks/              # seed-task taxonomy
+│   └── metrics · exporters · preferences · dedup · hub · utils
+├── packs/                  # scenario packs (core_v1, core_v2) + oracles + registry
+├── app.py                  # Gradio playground (agentsynth.tech + HF Space)
+├── hub/                    # the Scenario Hub — FastAPI: packs, submissions, leaderboard
+├── action.yml              # GitHub Action: gate CI on a pack's pass^k
+├── recipes/                # YAML generation recipes for `run_recipe`
+├── scripts/                # dataset / fine-tune / hard-set scripts
+├── examples/               # runnable examples + a demo MCP server
+├── notebooks/              # fine-tune (SFT) and GRPO (RL) reproduction notebooks
+├── docs/                   # VISION · ARCHITECTURE · BENCHMARK · MANIFESTO · reference
 ├── tests/                  # pytest suite
-├── pyproject.toml          # packaging / metadata
+├── pyproject.toml
 └── README.md
 ```
 
@@ -757,25 +769,32 @@ AgentSynth/
 
 ## Roadmap
 
-- [ ] More agent personas & domain-specific tool packs.
-- [ ] Configurable rubric presets (strict / lenient / safety-focused).
-- [ ] Difficulty-aware curriculum sampling for batches.
-- [ ] Direct `datasets.Dataset` / `push_to_hub` export helper.
-- [ ] Pairwise / preference (DPO-style) trajectory generation.
-- [ ] Streaming generation progress in the Gradio UI.
+Short version: **CI-for-agents** — a `pass^k` regression gate in every pipeline — a
+growing registry of community **scenario packs**, each with its own live leaderboard,
+richer environments, and real-LLM verified dataset drops. The full, current list lives
+in [ROADMAP.md](ROADMAP.md); issues tagged **good first issue** and **pack wanted** are
+the easiest ways in.
 
 ---
 
 ## Contributing
 
-Contributions are welcome.
+The highest-leverage contribution is a **scenario pack** for a domain you know — real
+tasks over a seeded world, with an oracle proving they're solvable:
 
-1. Fork the repo and create a feature branch.
-2. Keep changes Python 3.9-compatible and add or extend tests under `tests/`.
-3. Run the suite: `pytest`.
-4. Open a PR with a clear description.
+```bash
+agentsynth pack new my_domain_v1 --dir packs       # skeleton + oracle stub
+agentsynth pack validate packs/my_domain_v1.yaml   # the same gate CI runs
+```
 
-Bug reports, new tool catalogs, and additional export formats all make good first contributions.
+The validator enforces unique ids, an oracle that scores 100%, same-seed determinism,
+and a lazy-policy floor — so a merged pack is trustworthy on day one and gets its own
+live leaderboard. See [`packs/README.md`](packs/README.md) for the full gate.
+
+For code changes: fork, branch, keep it Python 3.9-compatible (the core avoids `list[…]`
+/ `X | None` syntax), add or extend tests under `tests/`, and keep `pytest` / `ruff` /
+`mypy` green before opening a PR. Issues tagged **good first issue** and **pack wanted**
+are good starting points. See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
 
 ---
 
@@ -791,14 +810,14 @@ If you use AgentSynth in your research or product, please cite it:
 
 ```bibtex
 @software{agentsynth2026,
-  title        = {AgentSynth: Synthetic Agentic Trajectories Generator with an LLM-as-Judge Evaluation Loop},
-  author       = {Your Name and Contributors},
+  title        = {AgentSynth: Outcome-Verified Synthetic Agent Trajectories, Benchmarks, and RL Environments},
+  author       = {AgentSynth Contributors},
   year         = {2026},
   url          = {https://github.com/agentsynth/agentsynth},
-  note         = {Open-source library for generating and evaluating synthetic agent trajectories}
+  note         = {Open-source library for generating, verifying, and benchmarking agent trajectories}
 }
 ```
 
 ---
 
-<sub>Suggested GitHub topics: `synthetic-data` · `agentic-ai` · `llm-finetuning` · `trajectories` · `tool-use` · `llm-as-judge`</sub>
+<sub>Suggested GitHub topics: `synthetic-data` · `agentic-ai` · `llm-finetuning` · `agent-evaluation` · `verifiable-rewards` · `rl-environments` · `benchmark` · `leaderboard` · `tool-use` · `llm-as-judge`</sub>

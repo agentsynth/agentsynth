@@ -1,7 +1,8 @@
 # Contributing to AgentSynth
 
-Thanks for taking the time. Bug reports, tool catalogs, new export formats, and
-docs fixes are all welcome, and small PRs get reviewed fastest.
+Thanks for taking the time. The single most valuable thing you can add is a
+**scenario pack** (see below); bug reports, new environments, export formats, and
+docs fixes are all welcome too, and small PRs get reviewed fastest.
 
 If you're planning something larger than a bug fix, open an issue or a Discussion
 first so we can agree on the shape before you write code.
