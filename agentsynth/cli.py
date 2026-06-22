@@ -210,7 +210,7 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Scaffold and validate scenario packs.",
         description="Create a pack skeleton, or run the gates a pack must pass to ship.",
     )
-    pack_sub = pack.add_subparsers(dest="pack_command", metavar="{new,validate,teach}")
+    pack_sub = pack.add_subparsers(dest="pack_command", metavar="{new,validate,teach,audit}")
 
     pack_new = pack_sub.add_parser("new", help="Write a pack skeleton plus its oracle next to it.")
     pack_new.add_argument("pack_id", metavar="ID", help="Pack id, e.g. devops_v1.")
@@ -248,6 +248,22 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     pack_teach.add_argument("--out", default="gold.jsonl", metavar="PATH")
     pack_teach.add_argument("--seed", type=int, default=7)
+
+    pack_audit = pack_sub.add_parser(
+        "audit",
+        help="Measure how gameable a pack's checkers are (reward-hacking resistance).",
+    )
+    pack_audit.add_argument("pack", metavar="PATH", help="Pack file to audit.")
+    pack_audit.add_argument(
+        "--min-robustness",
+        dest="min_robustness",
+        type=float,
+        default=0.0,
+        metavar="FRAC",
+        help="Fail (exit 1) if fewer than this fraction of scenarios resist every "
+        "trivial adversary. Default 0.0 (report only).",
+    )
+    pack_audit.add_argument("--seed", type=int, default=7)
 
     return parser
 
@@ -1033,6 +1049,18 @@ def _cmd_pack_validate(args: argparse.Namespace) -> int:
         return 1
     print(f"[ok] lazy guard — do-nothing policy passes {lazy.passed}/{lazy.n}")
 
+    from .robustness import audit_pack
+
+    audit = audit_pack(scenarios, seed=args.seed)
+    if audit.robustness_score >= 1.0:
+        print(f"[ok] robustness — {audit.robust}/{audit.n} resist every trivial adversary")
+    else:
+        weak = ", ".join(r.scenario_id for r in audit.rows if not r.robust) or "—"
+        print(
+            f"[warn] robustness {audit.robustness_score:.0%} — gameable: {weak}. "
+            "Run `agentsynth pack audit` for the breakdown."
+        )
+
     print("PACK OK")
     print(
         "→ packs this clean belong in the public registry: open a PR adding it to "
@@ -1075,6 +1103,24 @@ def _cmd_pack_teach(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_pack_audit(args: argparse.Namespace) -> int:
+    from .robustness import audit_pack
+    from .scenarios import load_scenarios
+
+    if not os.path.exists(args.pack):
+        raise SystemExit(f"error: pack not found: '{args.pack}'")
+    scenarios = load_scenarios(args.pack)
+    report = audit_pack(scenarios, seed=args.seed)
+    print(report.summary_md())
+    if report.robustness_score < args.min_robustness:
+        print(
+            f"\n[fail] robustness {report.robustness_score:.0%} is below the "
+            f"{args.min_robustness:.0%} floor"
+        )
+        return 1
+    return 0
+
+
 def _cmd_pack(args: argparse.Namespace) -> int:
     if args.pack_command == "new":
         return _cmd_pack_new(args)
@@ -1082,7 +1128,9 @@ def _cmd_pack(args: argparse.Namespace) -> int:
         return _cmd_pack_validate(args)
     if args.pack_command == "teach":
         return _cmd_pack_teach(args)
-    print("usage: agentsynth pack {new,validate,teach} ...")
+    if args.pack_command == "audit":
+        return _cmd_pack_audit(args)
+    print("usage: agentsynth pack {new,validate,teach,audit} ...")
     return 1
 
 

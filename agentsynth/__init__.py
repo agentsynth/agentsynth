@@ -67,6 +67,12 @@ from .preferences import (
     to_dpo_jsonl,
 )
 from .rl import AgentGym, make_reward_fn
+from .robustness import (
+    RobustnessReport,
+    audit_pack,
+    ipt_report,
+    perturb_scenario,
+)
 from .scale import BudgetExceeded, CachingLLMClient, CostMeter, run_resumable
 from .scenarios import (
     AnswerContains,
@@ -169,6 +175,11 @@ __all__ = [
     "run_scenario_suite",
     "load_scenarios",
     "save_scenarios",
+    # robustness (reward-hacking audit)
+    "audit_pack",
+    "RobustnessReport",
+    "perturb_scenario",
+    "ipt_report",
     # importers
     "import_traces",
     "load_traces_jsonl",

@@ -6,6 +6,20 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Reward-hacking / verifier-robustness audit (`agentsynth.robustness`, and
+  `agentsynth pack audit`). It measures how gameable a pack's checkers are by running
+  trivial adversaries that need no knowledge of the task — a canned answer, an echoed
+  prompt, a throwaway tool call — and flags scenarios graded on words rather than a
+  state change, plus answer targets that leaked into the prompt. `pack validate` now
+  prints a one-line robustness summary. For the generalizing case, `perturb_scenario`
+  builds an isomorphic sibling (rename the labels, keep the structure) and `ipt_report`
+  confirms a real solver still passes while a replayed transcript no longer does. This
+  operationalizes the failure modes from the 2026 "LLMs gaming verifiers" work
+  (arXiv:2604.15149). The `core_v2` audit scores 86% — the two refusal scenarios leak
+  their keywords, which the report calls out.
+
 ## [0.7.4] - 2026-06-12
 
 ### Changed
