@@ -210,7 +210,9 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Scaffold and validate scenario packs.",
         description="Create a pack skeleton, or run the gates a pack must pass to ship.",
     )
-    pack_sub = pack.add_subparsers(dest="pack_command", metavar="{new,validate,teach,audit}")
+    pack_sub = pack.add_subparsers(
+        dest="pack_command", metavar="{new,validate,teach,audit,export}"
+    )
 
     pack_new = pack_sub.add_parser("new", help="Write a pack skeleton plus its oracle next to it.")
     pack_new.add_argument("pack_id", metavar="ID", help="Pack id, e.g. devops_v1.")
@@ -273,6 +275,26 @@ def _build_parser() -> argparse.ArgumentParser:
         "trivial adversary. Default 0.0 (report only).",
     )
     pack_audit.add_argument("--seed", type=int, default=7)
+
+    pack_export = pack_sub.add_parser(
+        "export",
+        help="Export a pack as an OpenEnv or Prime Intellect verifiers environment.",
+    )
+    pack_export.add_argument("pack", metavar="PATH", help="Pack file to export.")
+    pack_export.add_argument(
+        "--format",
+        dest="fmt",
+        choices=["verifiers", "openenv"],
+        required=True,
+        help="Target ecosystem: a Prime Intellect verifiers env, or an OpenEnv server.",
+    )
+    pack_export.add_argument(
+        "--out",
+        dest="out",
+        default=None,
+        metavar="DIR",
+        help="Output folder (default: dist/<pack>-<format>).",
+    )
 
     return parser
 
@@ -1151,6 +1173,27 @@ def _cmd_pack_audit(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_pack_export(args: argparse.Namespace) -> int:
+    from .pack_export import export_pack
+
+    if not os.path.exists(args.pack):
+        raise SystemExit(f"error: pack not found: '{args.pack}'")
+    pack_id = os.path.splitext(os.path.basename(args.pack))[0]
+    out = args.out or os.path.join("dist", f"{pack_id}-{args.fmt}")
+    try:
+        paths = export_pack(args.pack, args.fmt, out)
+    except ValueError as exc:
+        raise SystemExit(f"error: {exc}")
+    for path in paths:
+        print(f"wrote {path}")
+    if args.fmt == "verifiers":
+        print(f"→ a verifiers environment is in {out}/ — `pip install verifiers` to run it,")
+        print("  then push the folder to the Prime Intellect Environments Hub")
+    else:
+        print(f"→ an OpenEnv environment is in {out}/ — needs agentsynth-ai[rl] (Python 3.10+)")
+    return 0
+
+
 def _cmd_pack(args: argparse.Namespace) -> int:
     if args.pack_command == "new":
         return _cmd_pack_new(args)
@@ -1160,7 +1203,9 @@ def _cmd_pack(args: argparse.Namespace) -> int:
         return _cmd_pack_teach(args)
     if args.pack_command == "audit":
         return _cmd_pack_audit(args)
-    print("usage: agentsynth pack {new,validate,teach,audit} ...")
+    if args.pack_command == "export":
+        return _cmd_pack_export(args)
+    print("usage: agentsynth pack {new,validate,teach,audit,export} ...")
     return 1
 
 

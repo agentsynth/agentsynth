@@ -27,6 +27,15 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   (the actions are the oracle) and audits 100% (every check is on the world). This is the
   cheap-authoring side of the "verifier problem": demonstrate once, the verifier writes
   itself. Multi-table worlds (the data lives in the schema's INSERTs) are handled.
+- Pack export to the open RL-environment ecosystems (`agentsynth.pack_export`, and
+  `agentsynth pack export --format {verifiers,openenv}`). A pack flows *into* the
+  standards everyone is converging on instead of competing with them: a portable
+  `scenario_reward` any framework can wrap, an OpenEnv server module (correct by
+  construction — it calls our own `to_openenv`), and a Prime Intellect `verifiers`
+  environment with `load_environment` whose reward is the same world-state check
+  (`reward_from_messages` scores an OpenAI-style completion). `export_pack` writes a
+  Hub-ready folder — the module, the bundled pack, a `pyproject.toml`, a README, and a
+  framework-neutral `manifest.json` — ready to push to the Environments Hub.
 
 ## [0.7.4] - 2026-06-12
 

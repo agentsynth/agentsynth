@@ -59,6 +59,11 @@ from .mining import (
     recipe_from_failures,
     targeted_queries,
 )
+from .pack_export import (
+    export_pack,
+    reward_from_messages,
+    scenario_reward,
+)
 from .pipelines import Recipe, RunResult, load_recipe, make_environment, run_recipe
 from .preferences import (
     PreferencePair,
@@ -184,6 +189,10 @@ __all__ = [
     # synth (auto-generate verifiers from a demonstration)
     "scenario_from_demonstration",
     "pack_from_demonstrations",
+    # pack export (OpenEnv / Prime Intellect verifiers)
+    "scenario_reward",
+    "reward_from_messages",
+    "export_pack",
     # importers
     "import_traces",
     "load_traces_jsonl",
