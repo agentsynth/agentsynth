@@ -40,6 +40,9 @@ flowchart LR
 | `generator.py` | `AgentTrajectoryGenerator`. Deterministic mock builders per mode, plus an LLM path that asks for a structured trajectory and falls back to mock on any failure. |
 | `evaluator.py` | `TrajectoryEvaluator`. Structural per-dimension scoring for the offline judge; an LLM judge that returns rubric JSON, falling back to structural. |
 | `scenarios.py` | Outcome-checked tasks: a `Scenario` bundles a seeded world, a goal, and checkers (`SqlCheck`, `HttpCheck`, `CalledTool`, `AnswerContains`). `run_scenario_suite` turns a pack into an outcome pass-rate; `load_scenarios` / `save_scenarios` (de)serialize YAML packs. |
+| `robustness.py` | How gameable a pack is: `audit_pack` runs trivial adversaries (canned answer, echoed prompt, throwaway call), detects leaked answers and no-op-satisfiable state checks, and `perturb_scenario` / `ipt_report` confirm a real solver survives an isomorphic sibling while a replayed transcript doesn't. |
+| `synth.py` | Verifiers from a demonstration: `scenario_from_demonstration` runs the actions, diffs the end state, and writes state checks for exactly what changed; `pack_from_demonstrations` emits a pack + oracle that validate and audit clean. |
+| `pack_export.py` | Ship a pack into the open ecosystems: `scenario_reward` / `reward_from_messages` (portable verifiable reward), and `export_pack` writes an OpenEnv server or a Prime Intellect `verifiers` environment, Hub-ready. |
 | `rl/` | `AgentGym` wraps a scenario as a gym episode whose terminal reward is the world-state verdict; `make_reward_fn` plugs it into TRL's `GRPOTrainer`, and `to_openenv` bridges onto the OpenEnv standard. |
 | `adapters.py` | Bridge an OpenAI-style agent to a gym: `to_openai_tools` emits function-calling schemas, `action_from_openai_tool_call` converts a tool call back into a gym action. Bring your own loop, no rewrite. |
 | `verification/` | Verifiers that confirm a trajectory is sound (`ExecutionVerifier` re-runs code and checks the output reproduces; tool-arg and safety checks), an `EnsembleEvaluator`, a `LearnedVerifier` distilled from the judge, and rubric presets. |
@@ -58,7 +61,7 @@ flowchart LR
 | `scale.py` | Run generation like a job: `CachingLLMClient`, a `CostMeter` with a hard `BudgetExceeded` cap, and `run_resumable` checkpoints. |
 | `hub.py` | Push a dataset to the Hugging Face Hub with an auto-generated card (`push_dataset`, `dataset_card`). |
 | `demo.py` | The reference policies (`expert` / `read_only` / `lazy`) and the pack the playground runs. |
-| `cli.py` | The `agentsynth` console script: `generate`, `eval`, `import`, `flywheel`, `bench` (pass^k / compare / submit), and `pack` (new / validate / teach). |
+| `cli.py` | The `agentsynth` console script: `generate`, `eval`, `import`, `flywheel`, `bench` (pass^k / compare / submit), and `pack` (new / validate / teach / audit / export). |
 | `app.py` (repo root) | The Gradio playground. The only module that imports Gradio at the top. Importing it builds `demo` without calling an LLM. |
 | `hub/` (repo root) | The Scenario Hub: a FastAPI service that stores packs and submissions and serves the live leaderboard. |
 

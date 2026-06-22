@@ -58,6 +58,30 @@ The public surface, re-exported from the top-level `agentsynth` package.
 
 ::: agentsynth.save_scenarios
 
+## Robustness (reward-hacking audit)
+
+::: agentsynth.audit_pack
+
+::: agentsynth.RobustnessReport
+
+::: agentsynth.perturb_scenario
+
+::: agentsynth.ipt_report
+
+## Synthesize verifiers from a demonstration
+
+::: agentsynth.scenario_from_demonstration
+
+::: agentsynth.pack_from_demonstrations
+
+## Export a pack (OpenEnv / verifiers)
+
+::: agentsynth.scenario_reward
+
+::: agentsynth.reward_from_messages
+
+::: agentsynth.export_pack
+
 ## RL
 
 ::: agentsynth.AgentGym
