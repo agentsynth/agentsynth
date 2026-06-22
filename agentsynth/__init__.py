@@ -93,6 +93,7 @@ from .schemas import (
     Trajectory,
     TrajectoryStep,
 )
+from .synth import pack_from_demonstrations, scenario_from_demonstration
 from .tasks import SEED_TASKS, SeedTask, sample_tasks
 from .training import build_dpo_dataset, build_sft_dataset, to_dpo_records, to_sft_records
 from .utils import (
@@ -180,6 +181,9 @@ __all__ = [
     "RobustnessReport",
     "perturb_scenario",
     "ipt_report",
+    # synth (auto-generate verifiers from a demonstration)
+    "scenario_from_demonstration",
+    "pack_from_demonstrations",
     # importers
     "import_traces",
     "load_traces_jsonl",

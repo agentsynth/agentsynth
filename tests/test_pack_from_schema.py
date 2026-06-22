@@ -17,7 +17,9 @@ def test_generated_pack_validates(tmp_path, capsys):
         tmp_path, "CREATE TABLE orders (id INTEGER PRIMARY KEY, customer TEXT, status TEXT);"
     )
     assert code == 0 and pack.exists() and oracle.exists()
-    assert "self-check: oracle 3/3, do-nothing 0/3 — PACK OK" in capsys.readouterr().out
+    out = capsys.readouterr().out
+    assert "self-check: oracle 3/3, do-nothing 0/3, robustness" in out
+    assert "PACK OK" in out
 
     # the real gate, run independently
     assert cli_main(["pack", "validate", str(pack)]) == 0

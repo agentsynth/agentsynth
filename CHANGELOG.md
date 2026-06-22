@@ -19,6 +19,14 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   operationalizes the failure modes from the 2026 "LLMs gaming verifiers" work
   (arXiv:2604.15149). The `core_v2` audit scores 86% — the two refusal scenarios leak
   their keywords, which the report calls out.
+- Auto-generated verifiers from a demonstration (`agentsynth.synth`, and
+  `agentsynth pack new --from-demo`). Hand it a seed world and the actions that solve a
+  task; it runs them, diffs the end state, and writes a scenario whose checkers assert
+  exactly what changed — the robust kind, keyed on the primary key, with the row count
+  and an untouched witness row pinned against over-mutation. The generated pack validates
+  (the actions are the oracle) and audits 100% (every check is on the world). This is the
+  cheap-authoring side of the "verifier problem": demonstrate once, the verifier writes
+  itself. Multi-table worlds (the data lives in the schema's INSERTs) are handled.
 
 ## [0.7.4] - 2026-06-12
 

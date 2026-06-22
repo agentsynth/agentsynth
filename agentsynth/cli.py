@@ -224,6 +224,15 @@ def _build_parser() -> argparse.ArgumentParser:
         metavar="FILE.sql",
         help="Generate a starter pack from a CREATE TABLE schema (validates out of the box).",
     )
+    pack_new.add_argument(
+        "--from-demo",
+        dest="from_demo",
+        default=None,
+        metavar="FILE.json",
+        help="Generate a pack from worked demonstrations (a JSON list of "
+        "{task, schema, rows, actions, answer}); checkers are derived from each demo's "
+        "end state, so the pack validates and audits clean out of the box.",
+    )
     pack_new.add_argument("--seed", type=int, default=7)
 
     pack_val = pack_sub.add_parser(
@@ -945,11 +954,29 @@ def _cmd_pack_new(args: argparse.Namespace) -> int:
             raise SystemExit(f"error: refusing to overwrite '{path}'")
 
     from_schema = getattr(args, "from_schema", None)
+    from_demo = getattr(args, "from_demo", None)
+    if from_schema and from_demo:
+        raise SystemExit("error: pass --from-schema or --from-demo, not both")
     if from_schema:
         if not os.path.exists(from_schema):
             raise SystemExit(f"error: schema file not found: '{from_schema}'")
         with open(from_schema, encoding="utf-8") as fh:
             pack_text, oracle_text = _pack_from_schema(fh.read(), args.pack_id)
+    elif from_demo:
+        import json
+
+        from .synth import pack_from_demonstrations
+
+        if not os.path.exists(from_demo):
+            raise SystemExit(f"error: demo file not found: '{from_demo}'")
+        with open(from_demo, encoding="utf-8") as fh:
+            demos = json.load(fh)
+        if isinstance(demos, dict):
+            demos = [demos]
+        try:
+            pack_text, oracle_text = pack_from_demonstrations(demos, args.pack_id)
+        except (KeyError, ValueError) as exc:
+            raise SystemExit(f"error: could not build pack from demos: {exc}")
     else:
         pack_text = _PACK_TEMPLATE.format(pack_id=args.pack_id, dir=args.dir)
         oracle_text = _ORACLE_TEMPLATE.format(pack_id=args.pack_id)
@@ -962,16 +989,19 @@ def _cmd_pack_new(args: argparse.Namespace) -> int:
     print(f"wrote {pack_path}")
     print(f"wrote {oracle_path}")
 
-    if from_schema:
+    if from_schema or from_demo:
         # prove the generated pack already passes the gate
+        from .robustness import audit_pack
         from .scenarios import load_scenarios, run_scenario_suite
 
         scenarios = load_scenarios(pack_path)
         oracle = _load_policy_ref(f"{oracle_path}:solve")
         ok = run_scenario_suite(oracle, scenarios, seed=args.seed)
         lazy = run_scenario_suite(_lazy_policy, scenarios, seed=args.seed)
+        audit = audit_pack(scenarios, seed=args.seed)
         print(
-            f"self-check: oracle {ok.passed}/{ok.n}, do-nothing {lazy.passed}/{lazy.n} — "
+            f"self-check: oracle {ok.passed}/{ok.n}, do-nothing {lazy.passed}/{lazy.n}, "
+            f"robustness {audit.robustness_score:.0%} — "
             + ("PACK OK" if ok.passed == ok.n and lazy.pass_rate < 0.5 else "review needed")
         )
         print("Rename the scenarios to your real tasks, keep the oracle solving them, then:")
