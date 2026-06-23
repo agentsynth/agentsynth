@@ -321,7 +321,8 @@ def _repro_badge(scenario: Any, policy_label: str, score: float) -> str:
         '<div class="repro"><span class="repro-ic">&#10003;</span>'
         f'<span><b>reproducible</b> &mdash; <code>run_hash {digest}</code><br>'
         '<span class="repro-sub">same pack + policy + seed re-derives this exact hash &middot; '
-        'check any leaderboard entry with <code>agentsynth pack verify-run</code></span></span></div>'
+        "check any leaderboard entry with <code>agentsynth pack verify-run</code>"
+        "</span></span></div>"
     )
 
 
@@ -886,12 +887,14 @@ footer{display:none !important}
    min-width and the whole page overflows. Let every layer shrink (the tabs scroll),
    stack the control rows, wrap long SQL/code, and clip any residual bleed. */
 @media (max-width:700px){
-  .gradio-container{max-width:100% !important;padding-left:8px !important;padding-right:8px !important}
+  .gradio-container{max-width:100% !important;
+    padding-left:8px !important;padding-right:8px !important}
   body{overflow-x:hidden}
   main.fillable,main.app,.gradio-container .contain,.gradio-container .column,
   .gradio-container .block,.gradio-container .form,.gradio-container .wrap{
     min-width:0 !important;max-width:100% !important}
-  .tabs,.tab-wrapper,.tab-container,[role="tablist"]{min-width:0 !important;overflow-x:auto !important}
+  .tabs,.tab-wrapper,.tab-container,[role="tablist"]{
+    min-width:0 !important;overflow-x:auto !important}
   input,textarea,select{min-width:0 !important;max-width:100% !important}
   .as-controls{flex-direction:column !important;flex-wrap:wrap !important}
   .as-controls > *{width:100% !important;min-width:0 !important}
