@@ -89,6 +89,7 @@ from .scale import BudgetExceeded, CachingLLMClient, CostMeter, run_resumable
 from .scenarios import (
     AnswerContains,
     CalledTool,
+    CodeCheck,
     HttpCheck,
     Scenario,
     SqlCheck,
@@ -185,6 +186,7 @@ __all__ = [
     "HttpCheck",
     "CalledTool",
     "AnswerContains",
+    "CodeCheck",
     "run_scenario_suite",
     "load_scenarios",
     "save_scenarios",

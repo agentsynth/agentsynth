@@ -134,8 +134,44 @@ class AnswerContains(BaseModel):
         return CheckOutcome(name="answer", passed=passed, detail=detail)
 
 
+_CODE_SENTINEL = "__agentsynth_tests_ok__"
+
+
+class CodeCheck(BaseModel):
+    """Run the agent's Python against hidden tests (needs a python environment).
+
+    Gathers the code from every `python` tool call, appends the test, and runs the lot
+    in the sandbox. Passes only when the tests run clean — the outcome is whether the
+    code works, not whether the transcript claims it does.
+    """
+
+    kind: Literal["code"] = "code"
+    test: str  # appended after the agent's code; assert what a correct solution must do
+
+    def check(self, environment: Environment, trajectory: Trajectory) -> CheckOutcome:
+        codes = [
+            str((call.tool_args or {}).get("code", ""))
+            for call in trajectory.tool_calls()
+            if call.tool_name == "python"
+        ]
+        if not any(code.strip() for code in codes):
+            return CheckOutcome(name="code", passed=False, detail="no python code was run")
+        program = "\n".join(codes) + "\n" + self.test + f'\nprint("{_CODE_SENTINEL}")'
+        try:
+            if "python" in environment.tool_names():
+                result = environment.execute("python", {"code": program})
+            else:
+                result = PythonSandbox().execute("python", {"code": program})
+        except Exception as exc:  # the sandbox should not take the whole run down
+            return CheckOutcome(name="code", passed=False, detail=f"{type(exc).__name__}: {exc}")
+        passed = _CODE_SENTINEL in (result or "")
+        detail = "tests passed" if passed else (result or "no output")[-200:]
+        return CheckOutcome(name="code", passed=passed, detail=detail)
+
+
 Checker = Annotated[
-    Union[SqlCheck, HttpCheck, CalledTool, AnswerContains], Field(discriminator="kind")
+    Union[SqlCheck, HttpCheck, CalledTool, AnswerContains, CodeCheck],
+    Field(discriminator="kind"),
 ]
 
 
@@ -257,6 +293,7 @@ __all__ = [
     "HttpCheck",
     "CalledTool",
     "AnswerContains",
+    "CodeCheck",
     "Scenario",
     "ScenarioReport",
     "run_scenario_suite",

@@ -51,6 +51,12 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   may have seen, and **held-out siblings** via `perturb_scenario` — a contamination-
   resistant variant to bench against. `--corpus` checks overlap, `--held-out` writes the
   siblings, and the command exits non-zero when anything is flagged, for CI.
+- A `CodeCheck` checker and two domain packs. `CodeCheck` gathers the agent's Python from
+  its `python` tool calls, appends a hidden test, and runs the lot in the sandbox — code
+  is graded on whether the tests pass, the SWE-bench / terminal-bench direction at unit
+  scale. `code_v1` (4 coding tasks: is-prime, fizzbuzz, two-sum, dedup) and `policy_v1`
+  (4 tool-use-under-policy tasks in the tau2-bench spirit, graded on SQL state) both
+  validate and audit 100% robust.
 
 ## [0.7.4] - 2026-06-12
 

@@ -105,7 +105,7 @@ def _state_checks_hold_on_seed(checks: List[Dict[str, Any]]) -> bool:
     Vacuously true for a scenario with no state check at all — which is itself the
     signal: nothing asserts the world changed, so grading rests on answer/tool checks.
     """
-    state = [c for c in checks if str(c.get("name", "")).startswith(("sql", "http"))]
+    state = [c for c in checks if str(c.get("name", "")).startswith(("sql", "http", "code"))]
     return all(c.get("passed") for c in state)
 
 

@@ -9,6 +9,8 @@ that must pass 100% — which keeps the pack solvable and the leaderboard honest
 | --- | --- | --- | --- |
 | [`core_v2`](core_v2.yaml) | 14 | harder flagship: conditions, traps, multi-table consistency, tiered | agentsynth |
 | [`core_v1`](core_v1.yaml) | 10 | business ops over writable SQL | agentsynth |
+| [`policy_v1`](policy_v1.yaml) | 4 | tool-use under an explicit policy (tau2-style), graded on SQL state | agentsynth |
+| [`code_v1`](code_v1.yaml) | 4 | small coding tasks graded by hidden unit tests in the sandbox | agentsynth |
 
 `core_v2` is the recommended flagship. It spans easy → hard tiers (in each
 scenario's `metadata`), and four scenarios keep **two tables in agreement** —

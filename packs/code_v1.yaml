@@ -1,0 +1,76 @@
+# AgentSynth code pack, v1. Small coding tasks graded by hidden tests, not by the
+# transcript: the agent's Python is gathered from its `python` tool calls, the test is
+# appended, and the lot runs in the sandbox. A run passes only when the tests run clean.
+# This is the SWE-bench / terminal-bench direction at unit scale — outcome verification
+# over code instead of a writable database.
+
+- id: is-prime
+  task: >-
+    Write a function `is_prime(n)` that returns True when n is a prime number and False
+    otherwise. Use the `python` tool to define it.
+  metadata: {tier: easy, skills: [code, control-flow]}
+  max_steps: 6
+  environment:
+    type: python
+  checkers:
+    - kind: called_tool
+      name: python
+    - kind: code
+      test: |
+        assert is_prime(2) and is_prime(3) and is_prime(13) and is_prime(7919)
+        assert not is_prime(1) and not is_prime(0) and not is_prime(15) and not is_prime(1)
+        assert not is_prime(-7)
+
+- id: fizzbuzz
+  task: >-
+    Write a function `fizzbuzz(n)` that returns a list of strings for 1..n: "Fizz" for
+    multiples of 3, "Buzz" for multiples of 5, "FizzBuzz" for multiples of both, and the
+    number as a string otherwise. Define it with the `python` tool.
+  metadata: {tier: easy, skills: [code, modulo]}
+  max_steps: 6
+  environment:
+    type: python
+  checkers:
+    - kind: called_tool
+      name: python
+    - kind: code
+      test: |
+        r = fizzbuzz(15)
+        assert len(r) == 15
+        assert r[0] == "1" and r[1] == "2"
+        assert r[2] == "Fizz" and r[4] == "Buzz" and r[14] == "FizzBuzz"
+
+- id: two-sum
+  task: >-
+    Write a function `two_sum(nums, target)` that returns the indices of the two numbers
+    in `nums` that add up to `target`, as a list. Assume exactly one solution exists.
+    Define it with the `python` tool.
+  metadata: {tier: medium, skills: [code, hashing]}
+  max_steps: 6
+  environment:
+    type: python
+  checkers:
+    - kind: called_tool
+      name: python
+    - kind: code
+      test: |
+        assert sorted(two_sum([2, 7, 11, 15], 9)) == [0, 1]
+        assert sorted(two_sum([3, 2, 4], 6)) == [1, 2]
+        assert sorted(two_sum([3, 3], 6)) == [0, 1]
+
+- id: dedup-preserve-order
+  task: >-
+    Write a function `dedup(xs)` that removes duplicates from the list `xs` while keeping
+    the first occurrence of each element in order. Define it with the `python` tool.
+  metadata: {tier: medium, skills: [code, sets]}
+  max_steps: 6
+  environment:
+    type: python
+  checkers:
+    - kind: called_tool
+      name: python
+    - kind: code
+      test: |
+        assert dedup([1, 1, 2, 3, 2, 1]) == [1, 2, 3]
+        assert dedup([]) == []
+        assert dedup(["a", "b", "a", "c"]) == ["a", "b", "c"]
