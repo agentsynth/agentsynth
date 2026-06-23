@@ -6,6 +6,8 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-06-23
+
 ### Added
 
 - Reproducible run manifests (`agentsynth.provenance`, and `agentsynth pack verify-run`).
