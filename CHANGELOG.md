@@ -22,6 +22,12 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   judge, `bench`, and `proof_v2` all point at a local OpenAI-compatible server — vLLM
   (continuous batching = the cheap path for bulk generation) or Ollama — with no provider
   key. A local server gets a dummy key by default so OpenAI-compatible endpoints accept it.
+- Multi-turn user-simulator scenarios (`agentsynth.usersim`). Following τ²-bench, a scenario
+  can carry extra user turns in `metadata["user_turns"]`; `run_conversation` runs the policy
+  through them against one persistent world — tool calls accumulate, the environment is not
+  re-seeded between turns — and the outcome checks run once at the end, so an agent that
+  fixes turn one but breaks it on turn three fails. The scripted user list is a drop-in for
+  an LLM user-simulator.
 
 ## [0.8.0] - 2026-06-23
 

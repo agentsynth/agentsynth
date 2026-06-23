@@ -110,6 +110,7 @@ from .schemas import (
 from .synth import pack_from_demonstrations, scenario_from_demonstration
 from .tasks import SEED_TASKS, SeedTask, sample_tasks
 from .training import build_dpo_dataset, build_sft_dataset, to_dpo_records, to_sft_records
+from .usersim import ConversationResult, run_conversation, run_conversation_suite
 from .utils import (
     DEFAULT_TOOL_CATALOG,
     LLMClient,
@@ -211,6 +212,10 @@ __all__ = [
     "run_manifest",
     "verify_run",
     "pack_fingerprint",
+    # usersim (multi-turn user-simulator scenarios)
+    "run_conversation",
+    "run_conversation_suite",
+    "ConversationResult",
     # contamination audit
     "contamination_report",
     "ContaminationReport",

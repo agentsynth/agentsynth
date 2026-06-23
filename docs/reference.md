@@ -102,6 +102,22 @@ The public surface, re-exported from the top-level `agentsynth` package.
 
 ::: agentsynth.held_out_pack
 
+## Reproducible submissions
+
+::: agentsynth.run_manifest
+
+::: agentsynth.verify_run
+
+::: agentsynth.pack_fingerprint
+
+## Multi-turn (user simulator)
+
+::: agentsynth.run_conversation
+
+::: agentsynth.run_conversation_suite
+
+::: agentsynth.ConversationResult
+
 ## RL
 
 ::: agentsynth.AgentGym
