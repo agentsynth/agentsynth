@@ -50,10 +50,11 @@ Watch a policy work an outcome-checked world step by step, line policies up on a
 ## Features
 
 - **Outcome verification** — checkers assert on the world's end state (SQL rows, API responses, sandbox output), not the transcript. No grounding, no credit.
-- **Scenario packs + a live leaderboard** — `core_v2` ships 14 tiered, outcome-checked tasks (including multi-table consistency); `agentsynth bench --pack core_v2 --model <id> --submit` puts any model on the board. Scaffold your own with `agentsynth pack new`.
+- **Scenario packs + a live leaderboard** — `core_v2` (14 tiered SQL tasks, multi-table consistency), `policy_v1` (tool-use under an explicit policy, τ²-style), and `code_v1` (coding graded by hidden unit tests) ship in-repo; `agentsynth bench --pack core_v2 --model <id> --submit` puts any model on the board. Scaffold your own with `agentsynth pack new`.
 - **Reward-hacking resistance** — `agentsynth pack audit` measures how gameable a pack's checkers are with trivial adversaries (a canned answer, an echoed prompt, a throwaway call) and flags answers that leaked into the prompt, so a pack ships with a known robustness floor instead of a hidden one.
 - **Verifiers that write themselves** — `pack new --from-demo` derives robust state-checkers by diffing the world a demonstration produced, and `pack export` ships any pack to the Prime Intellect Environments Hub (`verifiers`) or to OpenEnv — the same outcome check, in their format.
-- **`pass^k` reliability** — `--trials k` scores a pack k times and counts a scenario only when every trial passes, the flakiness single-shot benchmarks hide.
+- **Reliability beyond pass@1** — `--trials k` reports the whole decay curve from pass^1 to pass^k, a Wilson confidence interval on each, and which scenarios are flaky rather than cleanly passing or failing — the reliability single-shot benchmarks hide.
+- **Contamination audit** — `agentsynth pack contamination` mints a canary per scenario, flags tasks that overlap a training corpus, and writes held-out isomorphic siblings to bench against, so a leaked benchmark can't quietly inflate the score.
 - **A CI gate for agents** — the repo doubles as a GitHub Action that fails a PR when the pass rate drops below a floor.
 - **Generate + a 6-dimension judge** — single-agent, multi-agent, and code-execution modes, scored on task completion, tool correctness, faithfulness, reasoning, efficiency, and safety, with a deterministic mock fallback.
 - **7 real environments** — SQL, Python sandbox, Docker, MCP, headless browser, REST/OpenAPI, and Composite. Tool calls execute for real.

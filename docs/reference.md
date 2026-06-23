@@ -52,6 +52,8 @@ The public surface, re-exported from the top-level `agentsynth` package.
 
 ::: agentsynth.AnswerContains
 
+::: agentsynth.CodeCheck
+
 ::: agentsynth.run_scenario_suite
 
 ::: agentsynth.load_scenarios
@@ -81,6 +83,24 @@ The public surface, re-exported from the top-level `agentsynth` package.
 ::: agentsynth.reward_from_messages
 
 ::: agentsynth.export_pack
+
+## Reliability (beyond pass@1)
+
+::: agentsynth.reliability_report
+
+::: agentsynth.ReliabilityReport
+
+::: agentsynth.wilson_interval
+
+## Contamination audit
+
+::: agentsynth.contamination_report
+
+::: agentsynth.ContaminationReport
+
+::: agentsynth.canary_for
+
+::: agentsynth.held_out_pack
 
 ## RL
 
