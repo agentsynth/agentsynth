@@ -6,6 +6,18 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Reproducible run manifests (`agentsynth.provenance`, and `agentsynth pack verify-run`).
+  A leaderboard score is only worth what you can re-derive, and 2026's contamination
+  findings make reproducibility the whole game. `bench` now emits a manifest that pins a
+  content hash of the pack (so it can't be edited under the score), the policy, seed,
+  trial count, version, and per-scenario outcomes, folded into a single `run_hash` printed
+  after every run and included in `--json` / `--submit`. `pack verify-run <manifest>
+  --policy …` re-runs it and reports whether it reproduced — exact for a deterministic
+  policy, within a `--tolerance` on the pass rate for a stochastic model — and flags a
+  pack whose fingerprint no longer matches. Anti-fabrication for the leaderboard.
+
 ## [0.8.0] - 2026-06-23
 
 ### Added

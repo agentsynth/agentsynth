@@ -211,7 +211,8 @@ def _build_parser() -> argparse.ArgumentParser:
         description="Create a pack skeleton, or run the gates a pack must pass to ship.",
     )
     pack_sub = pack.add_subparsers(
-        dest="pack_command", metavar="{new,validate,teach,audit,export,contamination}"
+        dest="pack_command",
+        metavar="{new,validate,teach,audit,export,contamination,verify-run}",
     )
 
     pack_new = pack_sub.add_parser("new", help="Write a pack skeleton plus its oracle next to it.")
@@ -316,6 +317,28 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Write contamination-resistant isomorphic siblings of every scenario here.",
     )
     pack_contam.add_argument("--threshold", type=float, default=0.8, metavar="FRAC")
+
+    pack_verify = pack_sub.add_parser(
+        "verify-run",
+        help="Re-run a submission's manifest and confirm it reproduces (anti-fabrication).",
+    )
+    pack_verify.add_argument(
+        "manifest", metavar="MANIFEST.json", help="A run manifest (or a bench --json report)."
+    )
+    pack_verify.add_argument(
+        "--pack", default=None, metavar="PACK", help="Pack to check against (default: the "
+        "manifest's pack_id, resolved locally or from the hub)."
+    )
+    pack_verify.add_argument("--policy", default=None, metavar="REF", help="Policy module:fn.")
+    pack_verify.add_argument("--model", default=None, metavar="ID", help="Or a LiteLLM model id.")
+    pack_verify.add_argument(
+        "--tolerance",
+        type=float,
+        default=0.0,
+        metavar="FRAC",
+        help="Allowed pass-rate difference for a stochastic model (default 0, exact).",
+    )
+    pack_verify.add_argument("--hub", default="https://api.agentsynth.tech", metavar="URL")
 
     return parser
 
@@ -693,6 +716,17 @@ def _cmd_bench(args: argparse.Namespace) -> int:
                 f"({elapsed / runs_total:.3f}s/run)"
             )
 
+    from .provenance import run_manifest
+
+    bench_name = args.name or args.model or args.policy or "anonymous"
+    manifest = run_manifest(
+        pack_id, scenarios, report, model=bench_name, seed=args.seed, trials=trials
+    )
+    print(
+        f"\nrun_hash {manifest['run_hash']} (pack {manifest['pack_fingerprint']}) — "
+        "reproducible with `agentsynth pack verify-run`"
+    )
+
     if args.submit is None and report.passed > 0:
         print("→ add --submit to put this run on the live leaderboard (agentsynth.tech)")
 
@@ -701,12 +735,13 @@ def _cmd_bench(args: argparse.Namespace) -> int:
 
         blob = {
             "pack_id": pack_id,
-            "name": args.name or args.model or args.policy or "anonymous",
+            "name": bench_name,
             "seed": args.seed,
             "trials": trials,
             "pass1_avg": pass1_avg,
             "elapsed_s": round(elapsed, 3),
             "reliability": rel.model_dump() if rel is not None else None,
+            "manifest": manifest,
             **report.model_dump(),
         }
         with open(args.json_out, "w", encoding="utf-8") as fh:
@@ -716,13 +751,13 @@ def _cmd_bench(args: argparse.Namespace) -> int:
     if args.submit is not None:
         from . import __version__
 
-        name = args.name or args.model or args.policy or "anonymous"
         if trials > 1:
             print(f"submitting the pass^{trials} numbers (reliability-adjusted)")
         payload = {
             "pack_id": pack_id,
-            "model": name,
+            "model": bench_name,
             "report": report.model_dump(),
+            "manifest": manifest,
             "client_version": __version__,
         }
         url = (args.submit or args.hub).rstrip("/") + "/v1/submissions"
@@ -1294,6 +1329,48 @@ def _cmd_pack_contamination(args: argparse.Namespace) -> int:
     return 1 if report.flagged else 0
 
 
+def _cmd_pack_verify_run(args: argparse.Namespace) -> int:
+    import json
+
+    from .provenance import verify_run
+
+    if not os.path.exists(args.manifest):
+        raise SystemExit(f"error: manifest not found: '{args.manifest}'")
+    with open(args.manifest, encoding="utf-8") as fh:
+        data = json.load(fh)
+    # accept a raw manifest or a `bench --json` report that embeds one
+    if isinstance(data, dict) and "run_hash" not in data and isinstance(data.get("manifest"), dict):
+        manifest = data["manifest"]
+    else:
+        manifest = data
+    if not isinstance(manifest, dict) or "run_hash" not in manifest:
+        raise SystemExit("error: no run manifest in that file")
+
+    pack_ref = args.pack or manifest.get("pack_id")
+    if not pack_ref:
+        raise SystemExit("error: no pack — pass --pack or use a manifest carrying a pack_id")
+    scenarios, _ = _load_pack(pack_ref, args.hub)
+    policy = _resolve_policy(args)
+
+    result = verify_run(manifest, scenarios, policy, tolerance=args.tolerance)
+    print(f"pack intact: {result['pack_intact']}")
+    print(
+        f"pass_rate:   expected {result['expected_pass_rate']}, got "
+        f"{result['actual_pass_rate']} (delta {result['pass_rate_delta']})"
+    )
+    print(f"run_hash:    expected {result['expected_hash']}, got {result['actual_hash']}")
+    if not result["pack_intact"]:
+        print("NOT REPRODUCED — the pack changed since the run (fingerprint mismatch)")
+    elif result["reproduced"]:
+        print("VERIFIED — exact reproduction")
+    elif result["within_tolerance"]:
+        print(f"VERIFIED — within tolerance {args.tolerance}")
+    else:
+        print("NOT REPRODUCED — the policy did not reproduce the claimed result")
+    ok = result["pack_intact"] and (result["reproduced"] or result["within_tolerance"])
+    return 0 if ok else 1
+
+
 def _cmd_pack(args: argparse.Namespace) -> int:
     if args.pack_command == "new":
         return _cmd_pack_new(args)
@@ -1307,7 +1384,12 @@ def _cmd_pack(args: argparse.Namespace) -> int:
         return _cmd_pack_export(args)
     if args.pack_command == "contamination":
         return _cmd_pack_contamination(args)
-    print("usage: agentsynth pack {new,validate,teach,audit,export,contamination} ...")
+    if args.pack_command == "verify-run":
+        return _cmd_pack_verify_run(args)
+    print(
+        "usage: agentsynth pack "
+        "{new,validate,teach,audit,export,contamination,verify-run} ..."
+    )
     return 1
 
 

@@ -77,6 +77,7 @@ from .preferences import (
     load_dpo_jsonl,
     to_dpo_jsonl,
 )
+from .provenance import pack_fingerprint, run_manifest, verify_run
 from .reliability import ReliabilityReport, reliability_report, wilson_interval
 from .rl import AgentGym, make_reward_fn
 from .robustness import (
@@ -206,6 +207,10 @@ __all__ = [
     "reliability_report",
     "ReliabilityReport",
     "wilson_interval",
+    # provenance (reproducible submissions)
+    "run_manifest",
+    "verify_run",
+    "pack_fingerprint",
     # contamination audit
     "contamination_report",
     "ContaminationReport",
