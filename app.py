@@ -826,6 +826,26 @@ _CSS = """
 .gradio-container{max-width:1200px !important;margin:0 auto !important}
 footer{display:none !important}
 
+/* mobile: keep everything inside the viewport. Gradio's flex layers default to
+   min-width:auto, so the 6-tab nav and the inputs impose a wider-than-screen
+   min-width and the whole page overflows. Let every layer shrink (the tabs scroll),
+   stack the control rows, wrap long SQL/code, and clip any residual bleed. */
+@media (max-width:700px){
+  .gradio-container{max-width:100% !important;padding-left:8px !important;padding-right:8px !important}
+  body{overflow-x:hidden}
+  main.fillable,main.app,.gradio-container .contain,.gradio-container .column,
+  .gradio-container .block,.gradio-container .form,.gradio-container .wrap{
+    min-width:0 !important;max-width:100% !important}
+  .tabs,.tab-wrapper,.tab-container,[role="tablist"]{min-width:0 !important;overflow-x:auto !important}
+  input,textarea,select{min-width:0 !important;max-width:100% !important}
+  .as-controls{flex-direction:column !important;flex-wrap:wrap !important}
+  .as-controls > *{width:100% !important;min-width:0 !important}
+  .traj,.verdict,.step-body,.mono{min-width:0 !important;word-break:break-word}
+  .codeblock,pre{white-space:pre-wrap !important;word-break:break-word}
+  #as-header{padding:12px 2px 10px}
+  #as-header .links a{margin-left:12px;font-size:13px}
+}
+
 /* the JSON editor stretches to the bottom of the settings column and scrolls inside */
 #tool-catalog{flex:1 1 0;min-height:240px;display:flex;flex-direction:column}
 #tool-catalog > .wrap:last-child{flex:1;min-height:0;display:flex;flex-direction:column}
@@ -991,7 +1011,7 @@ with gr.Blocks(title="AgentSynth — playground", **_BLOCKS_KW) as demo:
             "earns it. Scripted policies run offline; pick the LLM policy plus a model "
             "id to watch a real model try."
         )
-        with gr.Row():
+        with gr.Row(elem_classes=["as-controls"]):
             agent_scenario = gr.Dropdown(
                 choices=sorted(_DEMO_SCENARIOS),
                 value=next(iter(sorted(_DEMO_SCENARIOS)), None),
@@ -1028,7 +1048,7 @@ with gr.Blocks(title="AgentSynth — playground", **_BLOCKS_KW) as demo:
             "Line policies up against the whole pack — the CLI's `bench --compare`, "
             "in the browser. Two trials by default, so flaky wins don't count."
         )
-        with gr.Row():
+        with gr.Row(elem_classes=["as-controls"]):
             cmp_policies = gr.CheckboxGroup(
                 choices=list(DEMO_POLICIES),
                 value=list(DEMO_POLICIES),
