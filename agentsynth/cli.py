@@ -619,9 +619,14 @@ def _cmd_bench(args: argparse.Namespace) -> int:
 
     policy = _resolve_policy(args)
 
+    import time
+
     trials = max(1, int(args.trials))
+    t0 = time.perf_counter()
     reports = [run_scenario_suite(policy, scenarios, seed=args.seed + t) for t in range(trials)]
+    elapsed = time.perf_counter() - t0
     pass1_avg = None
+    rel = None
 
     if trials == 1:
         report = reports[0]
@@ -655,6 +660,18 @@ def _cmd_bench(args: argparse.Namespace) -> int:
         print(f"\npass^1 (avg of {trials} trials): {avg:.0%}")
         print(f"pass^{trials} (all trials must pass): {passed}/{len(agg)} ({report.pass_rate:.0%})")
 
+        from .reliability import reliability_report
+
+        rel = reliability_report(wins, trials)
+        print()
+        print(rel.summary_md())
+        runs_total = report.n * trials
+        if runs_total:
+            print(
+                f"throughput: {runs_total} runs in {elapsed:.1f}s "
+                f"({elapsed / runs_total:.3f}s/run)"
+            )
+
     if args.submit is None and report.passed > 0:
         print("→ add --submit to put this run on the live leaderboard (agentsynth.tech)")
 
@@ -667,6 +684,8 @@ def _cmd_bench(args: argparse.Namespace) -> int:
             "seed": args.seed,
             "trials": trials,
             "pass1_avg": pass1_avg,
+            "elapsed_s": round(elapsed, 3),
+            "reliability": rel.model_dump() if rel is not None else None,
             **report.model_dump(),
         }
         with open(args.json_out, "w", encoding="utf-8") as fh:

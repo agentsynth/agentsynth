@@ -71,6 +71,7 @@ from .preferences import (
     load_dpo_jsonl,
     to_dpo_jsonl,
 )
+from .reliability import ReliabilityReport, reliability_report, wilson_interval
 from .rl import AgentGym, make_reward_fn
 from .robustness import (
     RobustnessReport,
@@ -193,6 +194,10 @@ __all__ = [
     "scenario_reward",
     "reward_from_messages",
     "export_pack",
+    # reliability (beyond pass@1)
+    "reliability_report",
+    "ReliabilityReport",
+    "wilson_interval",
     # importers
     "import_traces",
     "load_traces_jsonl",

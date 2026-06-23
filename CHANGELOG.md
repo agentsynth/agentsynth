@@ -36,6 +36,13 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   (`reward_from_messages` scores an OpenAI-style completion). `export_pack` writes a
   Hub-ready folder — the module, the bundled pack, a `pyproject.toml`, a README, and a
   framework-neutral `manifest.json` — ready to push to the Environments Hub.
+- Reliability statistics beyond a single pass@1 (`agentsynth.reliability`, and the
+  `bench --trials k` output). It reports the whole decay curve from pass^1 to pass^k
+  (via the unbiased all-must-pass estimator `comb(c,k)/comb(n,k)`), a Wilson confidence
+  interval on each — sane at 0%, 100%, and small n where the normal approximation
+  collapses — which scenarios are flaky rather than cleanly passing or failing, and
+  run throughput. Follows the 2026 reliability-science framing (arXiv:2603.29231). The
+  numbers also land in the `--json` report.
 
 ## [0.7.4] - 2026-06-12
 
