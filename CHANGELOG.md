@@ -57,6 +57,12 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   scale. `code_v1` (4 coding tasks: is-prime, fizzbuzz, two-sum, dedup) and `policy_v1`
   (4 tool-use-under-policy tasks in the tau2-bench spirit, graded on SQL state) both
   validate and audit 100% robust.
+- A reproducible Proof v2 dataset runner (`scripts/proof_v2.py`). It generates, verifies
+  (execution / tool-arg / safety), dedups, and exports a high-signal trajectory dataset as
+  JSONL + ShareGPT, with a dataset card and a manifest. Runs offline against the mock by
+  default (so it works in CI and as a dry run); pass a model and set a provider key in the
+  environment for the real run. `--budget-usd` is a volume cap — the run is trimmed so a
+  rough cost estimate can't exceed it — and a real run is gated behind `--yes`.
 
 ## [0.7.4] - 2026-06-12
 
