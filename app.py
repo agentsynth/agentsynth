@@ -16,6 +16,10 @@ import gradio as gr
 
 from agentsynth import (
     AgentTrajectoryGenerator,
+    CalledTool,
+    CodeCheck,
+    Scenario,
+    SqlCheck,
     TrajectoryEvaluator,
     compute_dataset_metrics,
     default_tool_catalog,
@@ -359,6 +363,120 @@ def do_robustness() -> str:
         "robust. The ones that fall are graded on words, not the world — a canned answer, an "
         "echoed prompt, a throwaway tool call. <code>agentsynth pack audit</code> ships this "
         "gate; it operationalizes the 2026 “LLMs gaming verifiers” work.</p></div>"
+    )
+
+
+_CODE_DEMO = Scenario(
+    id="is-prime",
+    task="Write a function `is_prime(n)` that returns True for primes.",
+    environment={"type": "python"},
+    checkers=[
+        CalledTool(name="python"),
+        CodeCheck(test="assert is_prime(13) and not is_prime(15) and not is_prime(1)"),
+    ],
+)
+_CODE_GOOD = (
+    "def is_prime(n):\n    if n < 2:\n        return False\n    i = 2\n"
+    "    while i * i <= n:\n        if n % i == 0:\n            return False\n"
+    "        i += 1\n    return True\n"
+)
+_CODE_BUGGY = "def is_prime(n):\n    return n > 1   # claims 9, 15, ... are prime\n"
+
+
+def do_code_demo(submission: str) -> str:
+    """Code graded by hidden unit tests, not by the transcript (P1.3 / CodeCheck)."""
+    from agentsynth.rl import AgentGym
+
+    code = _CODE_BUGGY if submission and "buggy" in submission else _CODE_GOOD
+
+    def policy(observation: str, gym: Any) -> dict:
+        if gym.step_count == 0:
+            return {"tool_name": "python", "arguments": {"code": code}}
+        return {"answer": "Defined is_prime."}
+
+    gym = AgentGym.from_scenario(_CODE_DEMO, seed=7)
+    try:
+        episode = gym.rollout(policy)
+    finally:
+        gym.close()
+    outcome = episode.info.get("outcome", {})
+    return _outcome_card(outcome, episode.total_reward) + render_tree(episode.trajectory)
+
+
+def do_contamination() -> str:
+    """Canaries + held-out siblings: is the benchmark already in the training set? (P1.4)."""
+    from agentsynth.contamination import contamination_report
+
+    report = contamination_report(list(_DEMO_SCENARIOS.values()))
+    rows = "".join(
+        f'<tr><td class="mono">{_esc(r.id)}</td><td class="mono">{_esc(r.canary)}</td></tr>'
+        for r in report.rows[:6]
+    )
+    return (
+        '<div class="traj"><div class="traj-head"><b>Contamination canaries</b>'
+        '<span class="badge soft">embed &amp; grep</span></div>'
+        '<p class="dim-text">A unique token per scenario. Embed it in the pack, then search a '
+        "model's outputs or a training corpus for it — a hit means the pack was memorized, not "
+        "solved.</p>"
+        f'<table class="cmp"><tr><th>scenario</th><th>canary</th></tr>{rows}</table>'
+        '<p class="dim-text" style="margin-top:12px">For a contamination-resistant score, '
+        "<code>agentsynth pack contamination --held-out</code> rewrites the labels into "
+        "isomorphic siblings a memorizing model can't match.</p></div>"
+    )
+
+
+_CONVO_DEMO = Scenario(
+    id="refund-then-cancel",
+    task="Refund order 7.",
+    metadata={"user_turns": ["Thanks — actually, please also cancel order 8."]},
+    environment={
+        "type": "sql",
+        "schema": "CREATE TABLE orders (id INTEGER PRIMARY KEY, status TEXT)",
+        "table": "orders",
+        "rows": [[7, "paid"], [8, "paid"]],
+    },
+    checkers=[
+        SqlCheck(query="SELECT status FROM orders WHERE id=7", equals=[["refunded"]]),
+        SqlCheck(query="SELECT status FROM orders WHERE id=8", equals=[["cancelled"]]),
+    ],
+)
+
+
+def do_conversation() -> str:
+    """A multi-turn user-simulator conversation, graded on the end state (P2.3 / usersim)."""
+    from agentsynth.usersim import run_conversation
+
+    def policy(observation: str, ctx: Any) -> dict:
+        if ctx.step_count == 0:
+            sql = (
+                "UPDATE orders SET status='refunded' WHERE id=7"
+                if ctx.turn == 0
+                else "UPDATE orders SET status='cancelled' WHERE id=8"
+            )
+            return {"tool_name": "sql_query", "arguments": {"query": sql}}
+        return {"answer": "Done — anything else?"}
+
+    result = run_conversation(policy, _CONVO_DEMO)
+    badge = (
+        '<span class="badge pass">PASS</span>'
+        if result.passed
+        else '<span class="badge fail">FAIL</span>'
+    )
+    turns = "".join(
+        f'<div class="ocheck"><span class="oname">turn {i + 1}</span>'
+        f'<span class="odetail"><b>user:</b> {_esc(t.user)}<br><b>agent:</b> {_esc(t.agent)} '
+        f'<span class="dim-text">({t.tool_calls} tool call'
+        f'{"" if t.tool_calls == 1 else "s"})</span></span></div>'
+        for i, t in enumerate(result.turns)
+    )
+    return (
+        '<div class="traj"><div class="traj-head"><b>Conversation</b> '
+        f'{badge}<span class="dim-text" style="margin-left:auto">{result.n_turns} turns, '
+        "graded on the end state</span></div>"
+        f"{turns}"
+        '<p class="dim-text" style="margin-top:10px">One persistent world across the whole '
+        "exchange — fix turn one but break it on turn three and the run still fails. τ²-bench "
+        "style, via <code>run_conversation</code>.</p></div>"
     )
 
 
@@ -1141,14 +1259,42 @@ with gr.Blocks(title="AgentSynth — playground", **_BLOCKS_KW) as demo:
 
     with gr.Tab("Robustness"):
         gr.Markdown(
-            "**Can this benchmark be gamed?** Trivial adversaries — a canned answer, an echoed "
-            "prompt, a throwaway tool call — attack the pack; any scenario they pass is graded on "
-            "words, not the world. This is `agentsynth pack audit`, in the browser."
+            "**Can this benchmark be trusted?** Two failure modes: a model that *games* the "
+            "checkers without solving the task, and a pack that *leaked* into training. Audit "
+            "both — `agentsynth pack audit` and `pack contamination`, in the browser."
         )
-        rob_btn = gr.Button("Audit the pack", variant="primary", elem_id="rob-btn")
+        with gr.Row(elem_classes=["as-controls"]):
+            rob_btn = gr.Button("Audit for gaming", variant="primary", elem_id="rob-btn")
+            contam_btn = gr.Button("Contamination canaries", elem_id="contam-btn")
         rob_view = gr.Markdown("_Run the adversaries over the demo pack to see its robustness._")
         gr.Markdown(_FUNNEL_MD)
         rob_btn.click(do_robustness, inputs=None, outputs=[rob_view])
+        contam_btn.click(do_contamination, inputs=None, outputs=[rob_view])
+
+    with gr.Tab("Code"):
+        gr.Markdown(
+            "**Code graded by hidden tests** — the agent writes Python in the sandbox, then a "
+            "test it never sees runs against it. It passes only if the code works, not if the "
+            "transcript claims it does. This is the `CodeCheck` checker (pack `code_v1`)."
+        )
+        code_choice = gr.Radio(
+            ["correct solution", "buggy solution"],
+            value="correct solution",
+            label="What does the agent submit?",
+        )
+        code_btn = gr.Button("Run the hidden tests", variant="primary")
+        code_view = gr.Markdown(do_code_demo("correct"))
+        code_btn.click(do_code_demo, inputs=[code_choice], outputs=[code_view])
+
+    with gr.Tab("Conversation"):
+        gr.Markdown(
+            "**A multi-turn conversation, graded on the end state** (τ²-bench style). The user "
+            "asks across turns; the world persists; the checkers run once at the end — so an "
+            "agent that fixes turn one but forgets turn two fails. This is `run_conversation`."
+        )
+        convo_btn = gr.Button("Run the conversation", variant="primary")
+        convo_view = gr.Markdown(do_conversation())
+        convo_btn.click(do_conversation, inputs=None, outputs=[convo_view])
 
     with gr.Tab("Generate"):
         with gr.Row(equal_height=True):
