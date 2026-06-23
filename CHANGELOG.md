@@ -43,6 +43,14 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   collapses — which scenarios are flaky rather than cleanly passing or failing, and
   run throughput. Follows the 2026 reliability-science framing (arXiv:2603.29231). The
   numbers also land in the `--json` report.
+- Contamination audit for a pack (`agentsynth.contamination`, and `agentsynth pack
+  contamination`). Public benchmark scores inflate 5–15 points once the benchmark leaks
+  into training; this gives three defenses: a stable **canary** per scenario to embed and
+  later grep for in a model or corpus, **corpus overlap** (shingle-Jaccard of each task
+  against a candidate training set, reusing the dedup machinery) to flag scenarios a model
+  may have seen, and **held-out siblings** via `perturb_scenario` — a contamination-
+  resistant variant to bench against. `--corpus` checks overlap, `--held-out` writes the
+  siblings, and the command exits non-zero when anything is flagged, for CI.
 
 ## [0.7.4] - 2026-06-12
 

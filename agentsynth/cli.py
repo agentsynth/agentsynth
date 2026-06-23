@@ -8,7 +8,7 @@ from __future__ import annotations
 import argparse
 import os
 import sys
-from typing import Dict, List, Optional, Sequence
+from typing import Any, Dict, List, Optional, Sequence
 
 _FORMATS = ("jsonl", "sharegpt", "adp")
 
@@ -211,7 +211,7 @@ def _build_parser() -> argparse.ArgumentParser:
         description="Create a pack skeleton, or run the gates a pack must pass to ship.",
     )
     pack_sub = pack.add_subparsers(
-        dest="pack_command", metavar="{new,validate,teach,audit,export}"
+        dest="pack_command", metavar="{new,validate,teach,audit,export,contamination}"
     )
 
     pack_new = pack_sub.add_parser("new", help="Write a pack skeleton plus its oracle next to it.")
@@ -295,6 +295,27 @@ def _build_parser() -> argparse.ArgumentParser:
         metavar="DIR",
         help="Output folder (default: dist/<pack>-<format>).",
     )
+
+    pack_contam = pack_sub.add_parser(
+        "contamination",
+        help="Audit a pack for benchmark contamination (canaries, corpus overlap).",
+    )
+    pack_contam.add_argument("pack", metavar="PATH", help="Pack file to audit.")
+    pack_contam.add_argument(
+        "--corpus",
+        default=None,
+        metavar="FILE",
+        help="A training corpus (JSONL/JSON of records, or one document per line) to "
+        "check each scenario's task against for overlap.",
+    )
+    pack_contam.add_argument(
+        "--held-out",
+        dest="held_out",
+        default=None,
+        metavar="OUT.yaml",
+        help="Write contamination-resistant isomorphic siblings of every scenario here.",
+    )
+    pack_contam.add_argument("--threshold", type=float, default=0.8, metavar="FRAC")
 
     return parser
 
@@ -1213,6 +1234,66 @@ def _cmd_pack_export(args: argparse.Namespace) -> int:
     return 0
 
 
+def _load_corpus(path: str) -> List[str]:
+    """Read a contamination corpus: a JSON array, JSONL, or one document per line."""
+    import json
+
+    if not os.path.exists(path):
+        raise SystemExit(f"error: corpus not found: '{path}'")
+    with open(path, encoding="utf-8") as fh:
+        text = fh.read()
+
+    records: List[Any]
+    stripped = text.strip()
+    if stripped.startswith("["):
+        try:
+            records = json.loads(stripped)
+        except json.JSONDecodeError:
+            records = []
+    else:
+        records = []
+        for line in text.splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                records.append(json.loads(line))
+            except json.JSONDecodeError:
+                records.append(line)
+
+    out = []
+    for record in records:
+        if isinstance(record, dict):
+            out.append(
+                str(
+                    record.get("query")
+                    or record.get("task")
+                    or record.get("text")
+                    or record.get("prompt")
+                    or ""
+                )
+            )
+        else:
+            out.append(str(record))
+    return [t for t in out if t]
+
+
+def _cmd_pack_contamination(args: argparse.Namespace) -> int:
+    from .contamination import contamination_report, held_out_pack
+    from .scenarios import load_scenarios, save_scenarios
+
+    if not os.path.exists(args.pack):
+        raise SystemExit(f"error: pack not found: '{args.pack}'")
+    scenarios = load_scenarios(args.pack)
+    corpus = _load_corpus(args.corpus) if args.corpus else None
+    report = contamination_report(scenarios, corpus=corpus, threshold=args.threshold)
+    print(report.summary_md())
+    if args.held_out:
+        save_scenarios(held_out_pack(scenarios), args.held_out)
+        print(f"\nwrote held-out siblings -> {args.held_out}")
+    return 1 if report.flagged else 0
+
+
 def _cmd_pack(args: argparse.Namespace) -> int:
     if args.pack_command == "new":
         return _cmd_pack_new(args)
@@ -1224,7 +1305,9 @@ def _cmd_pack(args: argparse.Namespace) -> int:
         return _cmd_pack_audit(args)
     if args.pack_command == "export":
         return _cmd_pack_export(args)
-    print("usage: agentsynth pack {new,validate,teach,audit,export} ...")
+    if args.pack_command == "contamination":
+        return _cmd_pack_contamination(args)
+    print("usage: agentsynth pack {new,validate,teach,audit,export,contamination} ...")
     return 1
 
 

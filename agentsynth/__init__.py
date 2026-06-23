@@ -23,6 +23,12 @@ from .benchmarks import (
     report_table_md,
     run_benchmark,
 )
+from .contamination import (
+    ContaminationReport,
+    canary_for,
+    contamination_report,
+    held_out_pack,
+)
 from .dedup import DedupResult, decontaminate, dedup_trajectories
 from .environments import (
     BrowserEnvironment,
@@ -198,6 +204,11 @@ __all__ = [
     "reliability_report",
     "ReliabilityReport",
     "wilson_interval",
+    # contamination audit
+    "contamination_report",
+    "ContaminationReport",
+    "canary_for",
+    "held_out_pack",
     # importers
     "import_traces",
     "load_traces_jsonl",
