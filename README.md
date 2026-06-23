@@ -659,6 +659,16 @@ ev = TrajectoryEvaluator(model="gpt-4o-mini")
 
 If LiteLLM isn't installed, no key is set, or a request fails, AgentSynth falls back to mock instead of crashing. Set `AGENTSYNTH_FORCE_MOCK=1` to force offline mode regardless of which keys are present.
 
+**Local models (vLLM / Ollama).** Point everything — generation, the judge, `bench`, `proof_v2` — at a local OpenAI-compatible server with two env vars, no provider key:
+
+```bash
+export AGENTSYNTH_API_BASE=http://localhost:8000/v1   # vLLM (continuous batching = cheap bulk)
+export AGENTSYNTH_MODEL=openai/your-served-model
+# or Ollama: AGENTSYNTH_API_BASE=http://localhost:11434  AGENTSYNTH_MODEL=ollama/llama3
+```
+
+`LLMClient(model=..., api_base=...)` does the same in code.
+
 ---
 
 ## Dataset formats

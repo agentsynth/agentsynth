@@ -393,6 +393,14 @@ class LLMClient:
     When LiteLLM isn't installed or no provider key/model is configured,
     `available` is False and `complete` returns `""`; callers then fall back to
     deterministic mock generation.
+
+    Point it at a local server (vLLM, Ollama, any OpenAI-compatible endpoint) with
+    `api_base`, or the `AGENTSYNTH_API_BASE` + `AGENTSYNTH_MODEL` env vars — no provider
+    key needed. vLLM's continuous batching makes that the cheap path for bulk generation.
+
+        export AGENTSYNTH_API_BASE=http://localhost:8000/v1   # vLLM
+        export AGENTSYNTH_MODEL=openai/my-served-model
+        # or Ollama: AGENTSYNTH_API_BASE=http://localhost:11434, MODEL=ollama/llama3
     """
 
     def __init__(
@@ -401,11 +409,14 @@ class LLMClient:
         temperature: float = 0.7,
         max_tokens: int = 1536,
         api_key: Optional[str] = None,
+        api_base: Optional[str] = None,
     ) -> None:
-        self.model = model or detect_default_model()
+        self.model = model or os.environ.get("AGENTSYNTH_MODEL") or detect_default_model()
         self.temperature = temperature
         self.max_tokens = max_tokens
-        self.api_key = api_key
+        self.api_base = api_base or os.environ.get("AGENTSYNTH_API_BASE")
+        # A local OpenAI-compatible server (vLLM) wants a non-empty key; Ollama ignores it.
+        self.api_key = api_key or ("local" if self.api_base else None)
         self.last_error: Optional[str] = None
         self._litellm: Any = None
         self._import_litellm()
@@ -442,6 +453,7 @@ class LLMClient:
                 temperature=self.temperature if temperature is None else temperature,
                 max_tokens=self.max_tokens if max_tokens is None else max_tokens,
                 api_key=self.api_key,
+                api_base=self.api_base,
                 **kwargs,
             )
             return resp["choices"][0]["message"]["content"] or ""

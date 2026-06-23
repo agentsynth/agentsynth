@@ -17,6 +17,11 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   --policy …` re-runs it and reports whether it reproduced — exact for a deterministic
   policy, within a `--tolerance` on the pass rate for a stochastic model — and flags a
   pack whose fingerprint no longer matches. Anti-fabrication for the leaderboard.
+- First-class local-model backend. `LLMClient` now takes an `api_base` (and reads
+  `AGENTSYNTH_API_BASE` / `AGENTSYNTH_MODEL` from the environment), so generation, the
+  judge, `bench`, and `proof_v2` all point at a local OpenAI-compatible server — vLLM
+  (continuous batching = the cheap path for bulk generation) or Ollama — with no provider
+  key. A local server gets a dummy key by default so OpenAI-compatible endpoints accept it.
 
 ## [0.8.0] - 2026-06-23
 
