@@ -250,7 +250,11 @@ def do_agent_run(scenario_id: str, policy_name: str, model_choice: str) -> str:
         gym.close()
 
     outcome = episode.info.get("outcome", {})
-    return _outcome_card(outcome, episode.total_reward) + render_tree(episode.trajectory)
+    return (
+        _outcome_card(outcome, episode.total_reward)
+        + _repro_badge(scenario, policy_name, outcome.get("score", 0.0))
+        + render_tree(episode.trajectory)
+    )
 
 
 def do_agent_task(scenario_id: str) -> str:
@@ -303,6 +307,57 @@ def do_compare(policy_names: Optional[List[str]], model_choice: str, trials: flo
         f"<tr><th>scenario</th>{head}</tr>{''.join(rows)}"
         f'<tr><td class="mono"><b>{label}</b></td>{footer}</tr>{extra}'
         "</table></div>"
+    )
+
+
+def _repro_badge(scenario: Any, policy_label: str, score: float) -> str:
+    """The verifiable run_hash for this episode, so anyone can re-derive it (P2.1)."""
+    from agentsynth.provenance import pack_fingerprint, run_hash
+
+    fingerprint = pack_fingerprint([scenario])
+    rows = [{"id": scenario.id, "passed": score >= 1.0, "outcome_score": round(float(score), 6)}]
+    digest = run_hash(fingerprint, str(policy_label), 7, 1, rows)
+    return (
+        '<div class="repro"><span class="repro-ic">&#10003;</span>'
+        f'<span><b>reproducible</b> &mdash; <code>run_hash {digest}</code><br>'
+        '<span class="repro-sub">same pack + policy + seed re-derives this exact hash &middot; '
+        'check any leaderboard entry with <code>agentsynth pack verify-run</code></span></span></div>'
+    )
+
+
+def do_robustness() -> str:
+    """How gameable is the pack? Run the trivial adversaries over it (P0.1)."""
+    from agentsynth.robustness import audit_pack
+
+    scenarios = list(_DEMO_SCENARIOS.values())
+    report = audit_pack(scenarios)
+    pct = report.robustness_score
+    badge = (
+        f'<span class="badge {"pass" if pct >= 1 else "soft"}">{pct:.0%} resist gaming</span>'
+    )
+    rows = []
+    for row in report.rows:
+        gamed = ", ".join(row.gamed_by) if row.gamed_by else "—"
+        leaks = ", ".join(row.answer_leaks) if row.answer_leaks else "—"
+        change = "yes" if not row.state_noop_satisfiable else "no"
+        cls = "cmp-fail" if row.gamed_by else "cmp-ok"
+        rows.append(
+            f'<tr><td class="mono">{_esc(row.scenario_id)}</td>'
+            f'<td class="{cls}">{_esc(gamed)}</td>'
+            f'<td>{_esc(leaks)}</td><td>{change}</td></tr>'
+        )
+    return (
+        '<div class="traj"><div class="traj-head">'
+        f"<b>Robustness audit</b> {badge}"
+        '<span class="dim-text" style="margin-left:auto">adversaries: noop · constant · '
+        "echo · echo+probe</span></div>"
+        '<table class="cmp"><tr><th>scenario</th><th>gamed by</th>'
+        "<th>answer leaks</th><th>asserts a change</th></tr>"
+        f"{''.join(rows)}</table>"
+        '<p class="dim-text" style="margin-top:12px">A scenario no trivial adversary passes is '
+        "robust. The ones that fall are graded on words, not the world — a canned answer, an "
+        "echoed prompt, a throwaway tool call. <code>agentsynth pack audit</code> ships this "
+        "gate; it operationalizes the 2026 “LLMs gaming verifiers” work.</p></div>"
     )
 
 
@@ -937,6 +992,13 @@ footer{display:none !important}
   font-size:12.5px;color:#11141a}
 .odetail{flex:1;color:#5b6471}
 
+.repro{display:flex;align-items:flex-start;gap:9px;margin:-2px 0 14px;padding:11px 14px;
+  background:#f3faf6;border:1px solid #cdeada;border-radius:10px;font-size:13px;color:#11141a}
+.repro-ic{color:#0f9d58;font-weight:800;font-size:15px;line-height:1.35}
+.repro code{font:12px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:#e7f6ee;
+  border-radius:5px;padding:1px 6px;color:#0b7a44}
+.repro-sub{color:#5b6471;font-size:12px}
+
 /* dark theme: the cards go dark too instead of floating as white islands.
    One selector per rule — gradio's css scoper mangles comma lists under .dark. */
 .dark .traj{background:#14161c;border-color:#272b36}
@@ -961,6 +1023,9 @@ footer{display:none !important}
 .dark .chip.think{background:rgba(99,102,241,.18);color:#a5b4fc}
 .dark .steps:before{background:#272b36}
 .dark .traj-final{background:rgba(16,185,129,.08);color:#e6e9f0}
+.dark .repro{background:rgba(16,185,129,.08);border-color:#1f6f4a;color:#e6e9f0}
+.dark .repro code{background:rgba(16,185,129,.16);color:#34d399}
+.dark .repro-sub{color:#9aa3b2}
 .dark .vtrack{background:#272b36}
 .dark #as-header .links a{color:#9aa3b2}
 .dark #as-header .links a:hover{color:#a5b4fc}
@@ -1045,8 +1110,10 @@ with gr.Blocks(title="AgentSynth — playground", **_BLOCKS_KW) as demo:
 
     with gr.Tab("Compare"):
         gr.Markdown(
-            "Line policies up against the whole pack — the CLI's `bench --compare`, "
-            "in the browser. Two trials by default, so flaky wins don't count."
+            "Line policies up against the whole pack — the CLI's `bench --compare`, in the "
+            "browser. Two trials by default, so flaky wins don't count. `bench --trials` adds "
+            "the full reliability picture: the pass^1→pass^k decay curve, a Wilson confidence "
+            "interval, and which scenarios are flaky rather than cleanly passing."
         )
         with gr.Row(elem_classes=["as-controls"]):
             cmp_policies = gr.CheckboxGroup(
@@ -1068,6 +1135,17 @@ with gr.Blocks(title="AgentSynth — playground", **_BLOCKS_KW) as demo:
         gr.Markdown(_FUNNEL_MD)
 
         cmp_btn.click(do_compare, inputs=[cmp_policies, cmp_model, cmp_trials], outputs=[cmp_view])
+
+    with gr.Tab("Robustness"):
+        gr.Markdown(
+            "**Can this benchmark be gamed?** Trivial adversaries — a canned answer, an echoed "
+            "prompt, a throwaway tool call — attack the pack; any scenario they pass is graded on "
+            "words, not the world. This is `agentsynth pack audit`, in the browser."
+        )
+        rob_btn = gr.Button("Audit the pack", variant="primary", elem_id="rob-btn")
+        rob_view = gr.Markdown("_Run the adversaries over the demo pack to see its robustness._")
+        gr.Markdown(_FUNNEL_MD)
+        rob_btn.click(do_robustness, inputs=None, outputs=[rob_view])
 
     with gr.Tab("Generate"):
         with gr.Row(equal_height=True):
