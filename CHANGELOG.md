@@ -6,6 +6,8 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-06-23
+
 ### Added
 
 - Reward-hacking / verifier-robustness audit (`agentsynth.robustness`, and
