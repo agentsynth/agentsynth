@@ -105,3 +105,38 @@ def test_compare_tab_builds_the_pass_k_table():
 def test_compare_tab_needs_two_items():
     out = app.do_compare(["lazy (just talks)"], "mock (offline)", 1)
     assert "at least two" in out
+
+
+def test_agent_run_shows_a_reproducible_run_hash():
+    sid = next(iter(sorted(app._DEMO_SCENARIOS)))
+    out = app.do_agent_run(sid, "expert (inspect-act-verify)", "mock (offline)")
+    assert "reproducible" in out and "run_hash" in out
+    assert "pack verify-run" in out
+
+
+def test_robustness_tab_audits_the_pack():
+    out = app.do_robustness()
+    assert "resist gaming" in out
+    assert "gamed by" in out and "answer leaks" in out
+    # the demo pack's refusal scenarios fall to the echo+probe adversary
+    assert "refuse-cancel-shipped" in out and "echo+probe" in out
+
+
+def test_contamination_tab_mints_canaries():
+    out = app.do_contamination()
+    assert "agentsynth-canary-" in out
+    assert "held-out" in out or "isomorphic" in out
+
+
+def test_code_tab_grades_by_hidden_tests():
+    good = app.do_code_demo("correct solution")
+    assert "PASS" in good and "1.00" in good
+    buggy = app.do_code_demo("buggy solution")
+    assert "FAIL" in buggy
+
+
+def test_conversation_tab_runs_multi_turn():
+    out = app.do_conversation()
+    assert "PASS" in out
+    assert "turn 1" in out and "turn 2" in out
+    assert "cancel order 8" in out  # the follow-up user turn drove a second mutation
