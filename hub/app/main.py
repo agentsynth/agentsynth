@@ -13,7 +13,7 @@ import hashlib
 import os
 import time
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse
@@ -42,6 +42,10 @@ class Submission(Base):
     results = Column(JSON, nullable=False)
     client_version = Column(String(40), default="")
     ip_hash = Column(String(64), default="")
+    # reproducibility manifest (clients >= 0.9.0): a content hash of the pack and a run
+    # fingerprint, so anyone can re-derive the score with `agentsynth pack verify-run`.
+    run_hash = Column(String(64), default="")
+    pack_fingerprint = Column(String(64), default="")
 
 
 def _engine():
@@ -59,6 +63,28 @@ def _engine():
 engine = _engine()
 SessionLocal = sessionmaker(bind=engine, expire_on_commit=False, future=True)
 Base.metadata.create_all(engine)
+
+
+def _ensure_columns() -> None:
+    """Add the reproducibility columns to an existing table (create_all won't ALTER)."""
+    from sqlalchemy import text
+
+    for column in ("run_hash", "pack_fingerprint"):
+        try:
+            with engine.begin() as conn:
+                conn.execute(
+                    text(f"ALTER TABLE submissions ADD COLUMN IF NOT EXISTS {column} VARCHAR(64)")
+                )
+        except Exception:
+            # SQLite has no ADD COLUMN IF NOT EXISTS; try plain ADD and ignore "exists".
+            try:
+                with engine.begin() as conn:
+                    conn.execute(text(f"ALTER TABLE submissions ADD COLUMN {column} VARCHAR(64)"))
+            except Exception:
+                pass
+
+
+_ensure_columns()
 
 app = FastAPI(title="AgentSynth Scenario Hub", version="0.1.0")
 
@@ -83,6 +109,7 @@ class SubmissionIn(BaseModel):
     model: str = Field(min_length=1, max_length=200)
     report: Dict[str, Any]
     client_version: str = ""
+    manifest: Optional[Dict[str, Any]] = None
 
 
 _recent: Dict[str, List[float]] = {}
@@ -163,6 +190,14 @@ def submit(payload: SubmissionIn, request: Request) -> dict:
     if not (isinstance(pass_rate, (int, float)) and 0.0 <= pass_rate <= 1.0 and 0 <= passed <= n):
         raise HTTPException(status_code=422, detail="implausible pass numbers")
 
+    manifest = payload.manifest or {}
+    run_hash = str(manifest.get("run_hash", ""))[:64]
+    pack_fingerprint = str(manifest.get("pack_fingerprint", ""))[:64]
+    # a manifest that contradicts its own report is rejected — keep the two honest
+    if manifest and isinstance(manifest.get("pass_rate"), (int, float)):
+        if abs(float(manifest["pass_rate"]) - float(pass_rate)) > 1e-6:
+            raise HTTPException(status_code=422, detail="manifest pass_rate disagrees with report")
+
     ip = (request.client.host if request.client else "") or ""
     if _rate_limited(ip):
         raise HTTPException(status_code=429, detail="too many submissions; try later")
@@ -177,6 +212,8 @@ def submit(payload: SubmissionIn, request: Request) -> dict:
             results=[{"id": r.get("id"), "passed": bool(r.get("passed"))} for r in results],
             client_version=payload.client_version[:40],
             ip_hash=hashlib.sha256(ip.encode()).hexdigest()[:16],
+            run_hash=run_hash,
+            pack_fingerprint=pack_fingerprint,
         )
         db.add(row)
         db.commit()
@@ -213,6 +250,8 @@ def leaderboard(pack: str = "core_v1", limit: int = 50) -> dict:
             "passed": row.passed,
             "n": row.n,
             "submitted": row.created_at.isoformat() if row.created_at else None,
+            "run_hash": row.run_hash or None,
+            "reproducible": bool(row.run_hash),
         }
         for i, row in enumerate(best.values())
     ]
@@ -249,13 +288,22 @@ def pack_breakdown(pack_id: str) -> dict:
 @app.get("/leaderboard", response_class=HTMLResponse)
 def leaderboard_page(pack: str = "core_v1") -> str:
     data = leaderboard(pack=pack)
-    rows = (
-        "".join(
-            f"<tr><td>{e['rank']}</td><td class='m'>{_esc(e['model'])}</td>"
+
+    def _row(e: Dict[str, Any]) -> str:
+        vf = (
+            f'<span class="vf" title="reproducible — run_hash {e["run_hash"]}; '
+            'verify with agentsynth pack verify-run">&#10003;</span>'
+            if e["reproducible"]
+            else ""
+        )
+        return (
+            f"<tr><td>{e['rank']}</td><td class='m'>{_esc(e['model'])} {vf}</td>"
             f"<td><b>{e['pass_rate']:.0%}</b></td><td>{e['passed']}/{e['n']}</td>"
             f"<td class='d'>{(e['submitted'] or '')[:10]}</td></tr>"
-            for e in data["entries"]
         )
+
+    rows = (
+        "".join(_row(e) for e in data["entries"])
         or '<tr><td colspan="5" class="empty">No submissions yet — be the first.</td></tr>'
     )
     n_scenarios = len(PACKS.get(pack, []))
@@ -306,6 +354,7 @@ th{{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--mut
 td.m{{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:14px}}
 td.d{{color:var(--muted);font-size:13.5px}}
 td.empty{{color:var(--muted)}}
+.vf{{color:#16a34a;font-weight:700;cursor:help}}
 .how{{margin:30px 0 60px;background:var(--accent-soft);border-radius:12px;padding:18px 20px}}
 .how p{{margin:0 0 10px;font-size:14.5px}}
 code{{display:block;background:#0e1117;color:#e6edf3;border-radius:8px;padding:12px 14px;

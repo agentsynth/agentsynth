@@ -114,3 +114,34 @@ def test_submission_validation():
         json={"pack_id": PACK_ID, "model": "m", "report": dict(_report(), pass_rate=3.0)},
     )
     assert fake_numbers.status_code == 422
+
+
+def test_manifest_marks_a_submission_reproducible():
+    rate = 0.6
+    resp = client.post(
+        "/v1/submissions",
+        json={
+            "pack_id": PACK_ID,
+            "model": "verifiable-model",
+            "report": _report(rate),
+            "manifest": {"run_hash": "abc123def456", "pack_fingerprint": "fp00", "pass_rate": rate},
+        },
+    )
+    assert resp.status_code == 201, resp.text
+    board = client.get("/v1/leaderboard", params={"pack": PACK_ID}).json()
+    entry = next(e for e in board["entries"] if e["model"] == "verifiable-model")
+    assert entry["reproducible"] is True
+    assert entry["run_hash"] == "abc123def456"
+
+
+def test_manifest_disagreeing_with_its_report_is_rejected():
+    resp = client.post(
+        "/v1/submissions",
+        json={
+            "pack_id": PACK_ID,
+            "model": "liar",
+            "report": _report(0.9),
+            "manifest": {"run_hash": "x", "pass_rate": 0.1},  # contradicts the report
+        },
+    )
+    assert resp.status_code == 422
