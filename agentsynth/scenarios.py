@@ -198,6 +198,11 @@ class Scenario(BaseModel):
             return RestEnvironment(**config)
         if env_type == "python":
             return PythonSandbox(**config)
+        from .plugins import get_environment_factory
+
+        factory = get_environment_factory(env_type)
+        if factory is not None:
+            return factory(**config)
         raise ValueError(f"unknown scenario environment type {env_type!r}")
 
     def run_checks(

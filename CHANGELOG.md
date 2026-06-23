@@ -28,6 +28,11 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   re-seeded between turns — and the outcome checks run once at the end, so an agent that
   fixes turn one but breaks it on turn three fails. The scripted user list is a drop-in for
   an LLM user-simulator.
+- A plugin registry for custom environments (`agentsynth.plugins`). `register_environment`
+  adds a named environment factory at runtime, and packages can advertise one through the
+  `agentsynth.environments` entry point — so a scenario's `environment.type` resolves to a
+  third-party environment without forking the library. The built-in `sql` / `python` /
+  `rest` types resolve directly; anything else falls through to the registry.
 
 ## [0.8.0] - 2026-06-23
 

@@ -47,6 +47,7 @@ flowchart LR
 | `contamination.py` | Is the benchmark already in the training set? `canary_for` mints a per-scenario token, `corpus_overlap` flags tasks a model may have seen, and `held_out_pack` rewrites the labels (via `perturb_scenario`) for a contamination-resistant variant. |
 | `provenance.py` | Reproducible run manifests: `run_manifest` pins a content hash of the pack, the policy, seed, and outcomes into a `run_hash`; `verify_run` re-runs and confirms it reproduced. The leaderboard's anti-fabrication layer. |
 | `usersim.py` | Multi-turn user-simulator scenarios (τ²-bench style): `run_conversation` runs a policy through a scenario's `metadata["user_turns"]` against one persistent world, grading the end state after the whole exchange. |
+| `plugins.py` | A registry so the community can add environments without forking: `register_environment` at runtime, or an `agentsynth.environments` entry point at install time; a scenario's `environment.type` resolves through it. |
 | `rl/` | `AgentGym` wraps a scenario as a gym episode whose terminal reward is the world-state verdict; `make_reward_fn` plugs it into TRL's `GRPOTrainer`, and `to_openenv` bridges onto the OpenEnv standard. |
 | `adapters.py` | Bridge an OpenAI-style agent to a gym: `to_openai_tools` emits function-calling schemas, `action_from_openai_tool_call` converts a tool call back into a gym action. Bring your own loop, no rewrite. |
 | `verification/` | Verifiers that confirm a trajectory is sound (`ExecutionVerifier` re-runs code and checks the output reproduces; tool-arg and safety checks), an `EnsembleEvaluator`, a `LearnedVerifier` distilled from the judge, and rubric presets. |
@@ -96,7 +97,9 @@ scores; the overall is a weighted mean you can re-weight.
   validation gate — for a domain you know. See `packs/README.md`.
 - Bring your own agent loop: drive any gym from an OpenAI-style agent via
   `to_openai_tools` / `action_from_openai_tool_call`.
-- New environment: subclass `Environment` and register it in `make_environment`.
+- New environment: subclass `Environment` and `register_environment("name", factory)`
+  (or advertise it via the `agentsynth.environments` entry point) — a scenario's
+  `environment.type` then resolves to it, no fork required.
 - New export format: add a function in `exporters.py` and wire it into `save_dataset`.
 - New rubric weighting: pass `weights=` to `TrajectoryEvaluator`.
 - See `ROADMAP.md` for what's planned.

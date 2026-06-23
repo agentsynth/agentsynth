@@ -118,6 +118,12 @@ The public surface, re-exported from the top-level `agentsynth` package.
 
 ::: agentsynth.ConversationResult
 
+## Plugins (custom environments)
+
+::: agentsynth.register_environment
+
+::: agentsynth.available_environments
+
 ## RL
 
 ::: agentsynth.AgentGym

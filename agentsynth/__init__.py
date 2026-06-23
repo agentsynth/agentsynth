@@ -71,6 +71,7 @@ from .pack_export import (
     scenario_reward,
 )
 from .pipelines import Recipe, RunResult, load_recipe, make_environment, run_recipe
+from .plugins import available_environments, get_environment_factory, register_environment
 from .preferences import (
     PreferencePair,
     build_preference_pairs,
@@ -216,6 +217,10 @@ __all__ = [
     "run_conversation",
     "run_conversation_suite",
     "ConversationResult",
+    # plugins (custom environments)
+    "register_environment",
+    "available_environments",
+    "get_environment_factory",
     # contamination audit
     "contamination_report",
     "ContaminationReport",
