@@ -323,7 +323,7 @@ def _repro_badge(scenario: Any, policy_label: str, score: float) -> str:
     digest = run_hash(fingerprint, str(policy_label), 7, 1, rows)
     return (
         '<div class="repro"><span class="repro-ic">&#10003;</span>'
-        f'<span><b>reproducible</b> &mdash; <code>run_hash {digest}</code><br>'
+        f"<span><b>reproducible</b> &mdash; <code>run_hash {digest}</code><br>"
         '<span class="repro-sub">same pack + policy + seed re-derives this exact hash &middot; '
         "check any leaderboard entry with <code>agentsynth pack verify-run</code>"
         "</span></span></div>"
@@ -337,9 +337,7 @@ def do_robustness() -> str:
     scenarios = list(_DEMO_SCENARIOS.values())
     report = audit_pack(scenarios)
     pct = report.robustness_score
-    badge = (
-        f'<span class="badge {"pass" if pct >= 1 else "soft"}">{pct:.0%} resist gaming</span>'
-    )
+    badge = f'<span class="badge {"pass" if pct >= 1 else "soft"}">{pct:.0%} resist gaming</span>'
     rows = []
     for row in report.rows:
         gamed = ", ".join(row.gamed_by) if row.gamed_by else "—"
@@ -349,7 +347,7 @@ def do_robustness() -> str:
         rows.append(
             f'<tr><td class="mono">{_esc(row.scenario_id)}</td>'
             f'<td class="{cls}">{_esc(gamed)}</td>'
-            f'<td>{_esc(leaks)}</td><td>{change}</td></tr>'
+            f"<td>{_esc(leaks)}</td><td>{change}</td></tr>"
         )
     return (
         '<div class="traj"><div class="traj-head">'
@@ -466,7 +464,7 @@ def do_conversation() -> str:
         f'<div class="ocheck"><span class="oname">turn {i + 1}</span>'
         f'<span class="odetail"><b>user:</b> {_esc(t.user)}<br><b>agent:</b> {_esc(t.agent)} '
         f'<span class="dim-text">({t.tool_calls} tool call'
-        f'{"" if t.tool_calls == 1 else "s"})</span></span></div>'
+        f"{'' if t.tool_calls == 1 else 's'})</span></span></div>"
         for i, t in enumerate(result.turns)
     )
     return (
@@ -1190,331 +1188,354 @@ with gr.Blocks(title="AgentSynth — playground", **_BLOCKS_KW) as demo:
         js="() => document.body.classList.contains('dark')",
     )
 
-    with gr.Tab("Agent runs"):
-        gr.Markdown(
-            "**Watch an agent work an outcome-checked world.** A run passes only when "
-            "the world ends in the goal state — the lazy talker scores zero, the expert "
-            "earns it. Scripted policies run offline; pick the LLM policy plus a model "
-            "id to watch a real model try."
-        )
-        with gr.Row(elem_classes=["as-controls"]):
-            agent_scenario = gr.Dropdown(
-                choices=sorted(_DEMO_SCENARIOS),
-                value=next(iter(sorted(_DEMO_SCENARIOS)), None),
-                label="Scenario (core_v2)",
-                scale=2,
-            )
-            agent_policy = gr.Dropdown(
-                choices=list(DEMO_POLICIES) + [_LLM_POLICY_LABEL],
-                value=next(iter(DEMO_POLICIES)),
-                label="Policy",
-                scale=2,
-            )
-            agent_model = gr.Dropdown(
-                choices=_MODEL_CHOICES,
-                value=MOCK_LABEL,
-                label="Model (LLM policy only)",
-                allow_custom_value=True,
-                scale=2,
-            )
-        agent_task = gr.Markdown(do_agent_task(next(iter(sorted(_DEMO_SCENARIOS)), "")))
-        agent_btn = gr.Button("Run the episode", variant="primary", elem_id="agent-btn")
-        agent_view = gr.Markdown(_default_agent_view())
-        gr.Markdown(_FUNNEL_MD)
-
-        agent_scenario.change(do_agent_task, inputs=[agent_scenario], outputs=[agent_task])
-        agent_btn.click(
-            do_agent_run,
-            inputs=[agent_scenario, agent_policy, agent_model],
-            outputs=[agent_view],
-        )
-
-    with gr.Tab("Compare"):
-        gr.Markdown(
-            "Line policies up against the whole pack — the CLI's `bench --compare`, in the "
-            "browser. Two trials by default, so flaky wins don't count. `bench --trials` adds "
-            "the full reliability picture: the pass^1→pass^k decay curve, a Wilson confidence "
-            "interval, and which scenarios are flaky rather than cleanly passing."
-        )
-        with gr.Row(elem_classes=["as-controls"]):
-            cmp_policies = gr.CheckboxGroup(
-                choices=list(DEMO_POLICIES),
-                value=list(DEMO_POLICIES),
-                label="Scripted policies",
-                scale=3,
-            )
-            cmp_model = gr.Dropdown(
-                choices=_MODEL_CHOICES,
-                value=MOCK_LABEL,
-                label="Add an LLM (optional)",
-                allow_custom_value=True,
-                scale=2,
-            )
-            cmp_trials = gr.Slider(1, 3, value=2, step=1, label="Trials (pass^k)", scale=1)
-        cmp_btn = gr.Button("Run the comparison", variant="primary", elem_id="cmp-btn")
-        cmp_view = gr.Markdown("_Pick at least two policies, then run._")
-        gr.Markdown(_FUNNEL_MD)
-
-        cmp_btn.click(do_compare, inputs=[cmp_policies, cmp_model, cmp_trials], outputs=[cmp_view])
-
-    with gr.Tab("Robustness"):
-        gr.Markdown(
-            "**Can this benchmark be trusted?** Two failure modes: a model that *games* the "
-            "checkers without solving the task, and a pack that *leaked* into training. Audit "
-            "both — `agentsynth pack audit` and `pack contamination`, in the browser."
-        )
-        with gr.Row(elem_classes=["as-controls"]):
-            rob_btn = gr.Button("Audit for gaming", variant="primary", elem_id="rob-btn")
-            contam_btn = gr.Button("Contamination canaries", elem_id="contam-btn")
-        rob_view = gr.Markdown("_Run the adversaries over the demo pack to see its robustness._")
-        gr.Markdown(_FUNNEL_MD)
-        rob_btn.click(do_robustness, inputs=None, outputs=[rob_view])
-        contam_btn.click(do_contamination, inputs=None, outputs=[rob_view])
-
-    with gr.Tab("Code"):
-        gr.Markdown(
-            "**Code graded by hidden tests** — the agent writes Python in the sandbox, then a "
-            "test it never sees runs against it. It passes only if the code works, not if the "
-            "transcript claims it does. This is the `CodeCheck` checker (pack `code_v1`)."
-        )
-        code_choice = gr.Radio(
-            ["correct solution", "buggy solution"],
-            value="correct solution",
-            label="What does the agent submit?",
-        )
-        code_btn = gr.Button("Run the hidden tests", variant="primary")
-        code_view = gr.Markdown(do_code_demo("correct"))
-        code_btn.click(do_code_demo, inputs=[code_choice], outputs=[code_view])
-
-    with gr.Tab("Conversation"):
-        gr.Markdown(
-            "**A multi-turn conversation, graded on the end state** (τ²-bench style). The user "
-            "asks across turns; the world persists; the checkers run once at the end — so an "
-            "agent that fixes turn one but forgets turn two fails. This is `run_conversation`."
-        )
-        convo_btn = gr.Button("Run the conversation", variant="primary")
-        convo_view = gr.Markdown(do_conversation())
-        convo_btn.click(do_conversation, inputs=None, outputs=[convo_view])
-
-    with gr.Tab("Generate"):
-        with gr.Row(equal_height=True):
-            with gr.Column(scale=7):
-                gen_query = gr.Textbox(
-                    label="User query",
-                    lines=2,
-                    value="What's the weather in Paris and what's 18% tip on a $54 bill?",
+    with gr.Tab("Run"):
+        with gr.Tabs():
+            with gr.Tab("SQL"):
+                gr.Markdown(
+                    "**Watch an agent work an outcome-checked world.** A run passes only when "
+                    "the world ends in the goal state — the lazy talker scores zero, the expert "
+                    "earns it. Scripted policies run offline; pick the LLM policy plus a model "
+                    "id to watch a real model try."
                 )
-                gen_tools = gr.Code(
-                    label="Tool catalog (JSON)",
-                    language="json",
-                    value=_DEFAULT_CATALOG_JSON,
-                    max_lines=18,
-                    elem_id="tool-catalog",
-                )
-            with gr.Column(scale=5):
-                gen_mode = gr.Dropdown(
-                    ["single_agent", "multi_agent", "code_execution"],
-                    value="single_agent",
-                    label="Mode",
-                )
-                gen_model = gr.Dropdown(
-                    choices=_MODEL_CHOICES,
-                    value=_DEFAULT_MODEL_CHOICE,
-                    label="Generator model",
-                    allow_custom_value=True,
-                    info="Offline mock by default — pick or type a model id for a real LLM.",
-                )
-                with gr.Accordion("Generation settings", open=True):
-                    gen_num = gr.Slider(
-                        1, 1000, value=10, step=1, label="Trajectories", info="Batch size."
+                with gr.Row(elem_classes=["as-controls"]):
+                    agent_scenario = gr.Dropdown(
+                        choices=sorted(_DEMO_SCENARIOS),
+                        value=next(iter(sorted(_DEMO_SCENARIOS)), None),
+                        label="Scenario (core_v2)",
+                        scale=2,
                     )
-                    gen_temp = gr.Slider(0.0, 2.0, value=0.7, step=0.05, label="Temperature")
-                    gen_max_steps = gr.Slider(1, 12, value=6, step=1, label="Max steps")
-                    gen_vary = gr.Checkbox(
-                        label="Vary modes across the batch (diversity)", value=False
+                    agent_policy = gr.Dropdown(
+                        choices=list(DEMO_POLICIES) + [_LLM_POLICY_LABEL],
+                        value=next(iter(DEMO_POLICIES)),
+                        label="Policy",
+                        scale=2,
                     )
+                    agent_model = gr.Dropdown(
+                        choices=_MODEL_CHOICES,
+                        value=MOCK_LABEL,
+                        label="Model (LLM policy only)",
+                        allow_custom_value=True,
+                        scale=2,
+                    )
+                agent_task = gr.Markdown(do_agent_task(next(iter(sorted(_DEMO_SCENARIOS)), "")))
+                agent_btn = gr.Button("Run the episode", variant="primary", elem_id="agent-btn")
+                agent_view = gr.Markdown(_default_agent_view())
+                gr.Markdown(_FUNNEL_MD)
 
-        gen_btn = gr.Button("Generate batch", variant="primary", size="lg", elem_id="gen-btn")
+                agent_scenario.change(do_agent_task, inputs=[agent_scenario], outputs=[agent_task])
+                agent_btn.click(
+                    do_agent_run,
+                    inputs=[agent_scenario, agent_policy, agent_model],
+                    outputs=[agent_view],
+                )
 
-        gr.Examples(
-            label="Try one",
-            examples=[
-                [
-                    "What's the weather in Paris and what's 18% tip on a $54 bill?",
-                    "single_agent",
-                ],
-                [
-                    "Analyze last quarter's sales from the database and "
-                    "email a summary to the team.",
-                    "multi_agent",
-                ],
-                [
-                    "Compute the mean and standard deviation of 12, 19, 7, 22, 31.",
-                    "code_execution",
-                ],
-                [
-                    "Read report.csv and tell me the total revenue.",
-                    "single_agent",
-                ],
-            ],
-            inputs=[gen_query, gen_mode],
-        )
+            with gr.Tab("Code"):
+                gr.Markdown(
+                    "**Code graded by hidden tests** — the agent writes Python in "
+                    "the sandbox, then a test it never sees runs against it. It "
+                    "passes only if the code works, not if the transcript claims it "
+                    "does. This is the `CodeCheck` checker (pack `code_v1`)."
+                )
+                code_choice = gr.Radio(
+                    ["correct solution", "buggy solution"],
+                    value="correct solution",
+                    label="What does the agent submit?",
+                )
+                code_btn = gr.Button("Run the hidden tests", variant="primary")
+                code_view = gr.Markdown(do_code_demo("correct"))
+                code_btn.click(do_code_demo, inputs=[code_choice], outputs=[code_view])
 
-        gen_status = gr.Markdown("Ready. Configure your query and click **Generate batch**.")
+            with gr.Tab("Conversation"):
+                gr.Markdown(
+                    "**A multi-turn conversation, graded on the end state** "
+                    "(τ²-bench style). The user asks across turns; the world "
+                    "persists; the checkers run once at the end — so an agent that "
+                    "fixes turn one but forgets turn two fails. This is `run_conversation`."
+                )
+                convo_btn = gr.Button("Run the conversation", variant="primary")
+                convo_view = gr.Markdown(do_conversation())
+                convo_btn.click(do_conversation, inputs=None, outputs=[convo_view])
 
-        gr.Markdown("#### Batch explorer")
-        with gr.Row(equal_height=False):
-            with gr.Column(scale=6):
+    with gr.Tab("Benchmark"):
+        with gr.Tabs():
+            with gr.Tab("Compare"):
+                gr.Markdown(
+                    "Line policies up against the whole pack — the CLI's "
+                    "`bench --compare`, in the browser. Two trials by default, so "
+                    "flaky wins don't count. `bench --trials` adds the full "
+                    "reliability picture: the pass^1→pass^k decay curve, a Wilson "
+                    "confidence interval, and which scenarios are flaky rather than "
+                    "cleanly passing."
+                )
+                with gr.Row(elem_classes=["as-controls"]):
+                    cmp_policies = gr.CheckboxGroup(
+                        choices=list(DEMO_POLICIES),
+                        value=list(DEMO_POLICIES),
+                        label="Scripted policies",
+                        scale=3,
+                    )
+                    cmp_model = gr.Dropdown(
+                        choices=_MODEL_CHOICES,
+                        value=MOCK_LABEL,
+                        label="Add an LLM (optional)",
+                        allow_custom_value=True,
+                        scale=2,
+                    )
+                    cmp_trials = gr.Slider(1, 3, value=2, step=1, label="Trials (pass^k)", scale=1)
+                cmp_btn = gr.Button("Run the comparison", variant="primary", elem_id="cmp-btn")
+                cmp_view = gr.Markdown("_Pick at least two policies, then run._")
+                gr.Markdown(_FUNNEL_MD)
+
+                cmp_btn.click(
+                    do_compare, inputs=[cmp_policies, cmp_model, cmp_trials], outputs=[cmp_view]
+                )
+
+            with gr.Tab("Robustness"):
+                gr.Markdown(
+                    "**Can this benchmark be trusted?** Two failure modes: a model "
+                    "that *games* the checkers without solving the task, and a pack "
+                    "that *leaked* into training. Audit both — `agentsynth pack audit` "
+                    "and `pack contamination`, in the browser."
+                )
+                with gr.Row(elem_classes=["as-controls"]):
+                    rob_btn = gr.Button("Audit for gaming", variant="primary", elem_id="rob-btn")
+                    contam_btn = gr.Button("Contamination canaries", elem_id="contam-btn")
+                rob_view = gr.Markdown(
+                    "_Run the adversaries over the demo pack to see its robustness._"
+                )
+                gr.Markdown(_FUNNEL_MD)
+                rob_btn.click(do_robustness, inputs=None, outputs=[rob_view])
+                contam_btn.click(do_contamination, inputs=None, outputs=[rob_view])
+
+    with gr.Tab("Dataset"):
+        with gr.Tabs():
+            with gr.Tab("Generate"):
+                with gr.Row(equal_height=True):
+                    with gr.Column(scale=7):
+                        gen_query = gr.Textbox(
+                            label="User query",
+                            lines=2,
+                            value="What's the weather in Paris and what's 18% tip on a $54 bill?",
+                        )
+                        gen_tools = gr.Code(
+                            label="Tool catalog (JSON)",
+                            language="json",
+                            value=_DEFAULT_CATALOG_JSON,
+                            max_lines=18,
+                            elem_id="tool-catalog",
+                        )
+                    with gr.Column(scale=5):
+                        gen_mode = gr.Dropdown(
+                            ["single_agent", "multi_agent", "code_execution"],
+                            value="single_agent",
+                            label="Mode",
+                        )
+                        gen_model = gr.Dropdown(
+                            choices=_MODEL_CHOICES,
+                            value=_DEFAULT_MODEL_CHOICE,
+                            label="Generator model",
+                            allow_custom_value=True,
+                            info="Offline mock — pick or type a model id for a real LLM.",
+                        )
+                        with gr.Accordion("Generation settings", open=True):
+                            gen_num = gr.Slider(
+                                1, 1000, value=10, step=1, label="Trajectories", info="Batch size."
+                            )
+                            gen_temp = gr.Slider(
+                                0.0, 2.0, value=0.7, step=0.05, label="Temperature"
+                            )
+                            gen_max_steps = gr.Slider(1, 12, value=6, step=1, label="Max steps")
+                            gen_vary = gr.Checkbox(
+                                label="Vary modes across the batch (diversity)", value=False
+                            )
+
+                gen_btn = gr.Button(
+                    "Generate batch", variant="primary", size="lg", elem_id="gen-btn"
+                )
+
+                gr.Examples(
+                    label="Try one",
+                    examples=[
+                        [
+                            "What's the weather in Paris and what's 18% tip on a $54 bill?",
+                            "single_agent",
+                        ],
+                        [
+                            "Analyze last quarter's sales from the database and "
+                            "email a summary to the team.",
+                            "multi_agent",
+                        ],
+                        [
+                            "Compute the mean and standard deviation of 12, 19, 7, 22, 31.",
+                            "code_execution",
+                        ],
+                        [
+                            "Read report.csv and tell me the total revenue.",
+                            "single_agent",
+                        ],
+                    ],
+                    inputs=[gen_query, gen_mode],
+                )
+
+                gen_status = gr.Markdown(
+                    "Ready. Configure your query and click **Generate batch**."
+                )
+
+                gr.Markdown("#### Batch explorer")
+                with gr.Row(equal_height=False):
+                    with gr.Column(scale=6):
+                        with gr.Row():
+                            ov_mode = gr.Dropdown(
+                                ["all", "single_agent", "multi_agent", "code_execution"],
+                                value="all",
+                                label="Mode",
+                                scale=1,
+                            )
+                            ov_min_score = gr.Slider(
+                                0.0, 1.0, value=0.0, step=0.05, label="Min score", scale=2
+                            )
+                        gen_overview = gr.Dataframe(
+                            headers=_OVERVIEW_HEADERS,
+                            label="Click a row to inspect it",
+                            wrap=True,
+                            interactive=False,
+                            max_height=760,
+                            column_widths=["6%", "15%", "12%", "9%", "10%", "22%", "26%"],
+                        )
+                    with gr.Column(scale=6):
+                        gen_tree = gr.Markdown(
+                            value="_Generate a batch, then click a row to inspect it._",
+                            label="Selected trajectory",
+                            elem_id="traj-detail",
+                        )
+
+                gen_btn.click(
+                    do_generate,
+                    inputs=[
+                        gen_query,
+                        gen_tools,
+                        gen_mode,
+                        gen_num,
+                        gen_temp,
+                        gen_max_steps,
+                        gen_vary,
+                        gen_model,
+                    ],
+                    outputs=[gen_status, gen_tree, gen_overview, traj_state],
+                )
+
+                gen_overview.select(
+                    do_select_trajectory,
+                    inputs=[traj_state, eval_state, gen_overview],
+                    outputs=[gen_tree],
+                )
+                # filters apply as they change — no apply button to hunt for
+                ov_mode.change(
+                    do_filter_overview,
+                    inputs=[traj_state, eval_state, ov_mode, ov_min_score],
+                    outputs=[gen_overview],
+                )
+                ov_min_score.release(
+                    do_filter_overview,
+                    inputs=[traj_state, eval_state, ov_mode, ov_min_score],
+                    outputs=[gen_overview],
+                )
+
+            with gr.Tab("Evaluate"):
                 with gr.Row():
-                    ov_mode = gr.Dropdown(
-                        ["all", "single_agent", "multi_agent", "code_execution"],
-                        value="all",
-                        label="Mode",
-                        scale=1,
+                    eval_model = gr.Dropdown(
+                        choices=_MODEL_CHOICES,
+                        value=_DEFAULT_MODEL_CHOICE,
+                        label="Judge model",
+                        allow_custom_value=True,
+                        info="Offline heuristic judge by default.",
+                        scale=2,
                     )
-                    ov_min_score = gr.Slider(
-                        0.0, 1.0, value=0.0, step=0.05, label="Min score", scale=2
+                    eval_threshold = gr.Slider(
+                        0.0, 1.0, value=0.6, step=0.01, label="Pass threshold", scale=1
                     )
-                gen_overview = gr.Dataframe(
-                    headers=_OVERVIEW_HEADERS,
-                    label="Click a row to inspect it",
+                with gr.Accordion("What the judge scores", open=False):
+                    gr.Markdown(_RUBRIC_MD)
+                eval_btn = gr.Button(
+                    "Run the judge", variant="primary", size="lg", elem_id="eval-btn"
+                )
+
+                eval_summary = gr.Markdown(
+                    "Generate trajectories on the **Generate** tab, then run the judge here."
+                )
+                eval_table = gr.Dataframe(
+                    headers=_EVAL_HEADERS,
+                    label="Per-trajectory scores",
                     wrap=True,
                     interactive=False,
-                    max_height=760,
-                    column_widths=["6%", "15%", "12%", "9%", "10%", "22%", "26%"],
-                )
-            with gr.Column(scale=6):
-                gen_tree = gr.Markdown(
-                    value="_Generate a batch, then click a row in the overview to inspect it._",
-                    label="Selected trajectory",
-                    elem_id="traj-detail",
                 )
 
-        gen_btn.click(
-            do_generate,
-            inputs=[
-                gen_query,
-                gen_tools,
-                gen_mode,
-                gen_num,
-                gen_temp,
-                gen_max_steps,
-                gen_vary,
-                gen_model,
-            ],
-            outputs=[gen_status, gen_tree, gen_overview, traj_state],
-        )
+                eval_btn.click(
+                    do_evaluate,
+                    inputs=[traj_state, eval_model, eval_threshold],
+                    outputs=[eval_table, eval_summary, eval_state, gen_overview],
+                )
 
-        gen_overview.select(
-            do_select_trajectory,
-            inputs=[traj_state, eval_state, gen_overview],
-            outputs=[gen_tree],
-        )
-        # filters apply as they change — no apply button to hunt for
-        ov_mode.change(
-            do_filter_overview,
-            inputs=[traj_state, eval_state, ov_mode, ov_min_score],
-            outputs=[gen_overview],
-        )
-        ov_min_score.release(
-            do_filter_overview,
-            inputs=[traj_state, eval_state, ov_mode, ov_min_score],
-            outputs=[gen_overview],
-        )
+            with gr.Tab("Metrics"):
+                with gr.Row():
+                    metrics_btn = gr.Button(
+                        "Refresh metrics", variant="primary", elem_id="metrics-btn", scale=0
+                    )
+                metrics_summary = gr.Markdown(
+                    "Click **Refresh metrics** after generating (and optionally evaluating).",
+                    elem_id="kpi-summary",
+                )
+                with gr.Row():
+                    with gr.Column():
+                        plot_radar = gr.Plot(label="Rubric radar (mean per dimension)")
+                    with gr.Column():
+                        plot_spread = gr.Plot(label="Rubric spread per dimension")
+                with gr.Row():
+                    with gr.Column():
+                        plot_dist = gr.Plot(label="Overall score distribution")
+                    with gr.Column():
+                        plot_scatter = gr.Plot(label="Score vs trajectory length")
+                with gr.Row():
+                    plot_tools = gr.Plot(label="Tool usage (top 15)")
 
-    with gr.Tab("Evaluate"):
-        with gr.Row():
-            eval_model = gr.Dropdown(
-                choices=_MODEL_CHOICES,
-                value=_DEFAULT_MODEL_CHOICE,
-                label="Judge model",
-                allow_custom_value=True,
-                info="Offline heuristic judge by default.",
-                scale=2,
-            )
-            eval_threshold = gr.Slider(
-                0.0, 1.0, value=0.6, step=0.01, label="Pass threshold", scale=1
-            )
-        with gr.Accordion("What the judge scores", open=False):
-            gr.Markdown(_RUBRIC_MD)
-        eval_btn = gr.Button("Run the judge", variant="primary", size="lg", elem_id="eval-btn")
+                metrics_btn.click(
+                    do_metrics,
+                    inputs=[traj_state, eval_state, dark_flag],
+                    outputs=[
+                        metrics_summary,
+                        plot_radar,
+                        plot_dist,
+                        plot_spread,
+                        plot_scatter,
+                        plot_tools,
+                    ],
+                )
 
-        eval_summary = gr.Markdown(
-            "Generate trajectories on the **Generate** tab, then run the judge here."
-        )
-        eval_table = gr.Dataframe(
-            headers=_EVAL_HEADERS,
-            label="Per-trajectory scores",
-            wrap=True,
-            interactive=False,
-        )
+            with gr.Tab("Export"):
+                gr.Markdown(_EXPORT_MD)
+                with gr.Row(equal_height=True):
+                    export_fmt = gr.Dropdown(
+                        ["jsonl", "sharegpt", "adp"], value="jsonl", label="Format", scale=3
+                    )
+                    export_btn = gr.Button("Build dataset file", variant="primary", scale=1)
 
-        eval_btn.click(
-            do_evaluate,
-            inputs=[traj_state, eval_model, eval_threshold],
-            outputs=[eval_table, eval_summary, eval_state, gen_overview],
-        )
+                export_file = gr.File(label="Download", visible=False)
+                export_preview = gr.Code(label="Preview (first records)", language="json")
 
-    with gr.Tab("Metrics"):
-        with gr.Row():
-            metrics_btn = gr.Button(
-                "Refresh metrics", variant="primary", elem_id="metrics-btn", scale=0
-            )
-        metrics_summary = gr.Markdown(
-            "Click **Refresh metrics** after generating (and optionally evaluating).",
-            elem_id="kpi-summary",
-        )
-        with gr.Row():
-            with gr.Column():
-                plot_radar = gr.Plot(label="Rubric radar (mean per dimension)")
-            with gr.Column():
-                plot_spread = gr.Plot(label="Rubric spread per dimension")
-        with gr.Row():
-            with gr.Column():
-                plot_dist = gr.Plot(label="Overall score distribution")
-            with gr.Column():
-                plot_scatter = gr.Plot(label="Score vs trajectory length")
-        with gr.Row():
-            plot_tools = gr.Plot(label="Tool usage (top 15)")
+                with gr.Accordion("Raw trajectory objects", open=False):
+                    preview_btn = gr.Button("Load preview")
+                    preview_json = gr.JSON(label="First five trajectories")
 
-        metrics_btn.click(
-            do_metrics,
-            inputs=[traj_state, eval_state, dark_flag],
-            outputs=[
-                metrics_summary,
-                plot_radar,
-                plot_dist,
-                plot_spread,
-                plot_scatter,
-                plot_tools,
-            ],
-        )
-
-    with gr.Tab("Export"):
-        gr.Markdown(_EXPORT_MD)
-        with gr.Row(equal_height=True):
-            export_fmt = gr.Dropdown(
-                ["jsonl", "sharegpt", "adp"], value="jsonl", label="Format", scale=3
-            )
-            export_btn = gr.Button("Build dataset file", variant="primary", scale=1)
-
-        export_file = gr.File(label="Download", visible=False)
-        export_preview = gr.Code(label="Preview (first records)", language="json")
-
-        with gr.Accordion("Raw trajectory objects", open=False):
-            preview_btn = gr.Button("Load preview")
-            preview_json = gr.JSON(label="First five trajectories")
-
-        export_btn.click(
-            do_export,
-            inputs=[traj_state, export_fmt],
-            outputs=[export_file, export_preview],
-        )
-        preview_btn.click(
-            do_preview,
-            inputs=[traj_state],
-            outputs=[preview_json],
-        )
+                export_btn.click(
+                    do_export,
+                    inputs=[traj_state, export_fmt],
+                    outputs=[export_file, export_preview],
+                )
+                preview_btn.click(
+                    do_preview,
+                    inputs=[traj_state],
+                    outputs=[preview_json],
+                )
 
 
 if __name__ == "__main__":
