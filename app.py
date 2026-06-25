@@ -9,7 +9,9 @@ from __future__ import annotations
 
 import html
 import json
+import os
 import tempfile
+import urllib.parse
 from typing import Any, Dict, List, Optional, Tuple
 
 import gradio as gr
@@ -982,9 +984,31 @@ _EXPORT_MD = """\
 - **adp** — Agent Data Protocol (`adp/0.1`) style records.
 """
 
-_HEADER_HTML = """\
+# The header eye is hardcoded indigo/cyan and shipped as an <img> data URI, so the
+# page's own `svg path { fill }` theme rules can't repaint it (Gradio sets those, and
+# the rules differ between gradio 5 and 6). An image is isolated from page CSS.
+_EYE_SVG = (
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 84">'
+    '<path fill="#4f46e5" d="M16,56 C34,41 58,34 80,36 C92,37 103,38 111,33'
+    ' C105,39 97,45 90,45 C66,46 40,50 16,56 Z"/>'
+    '<path fill="none" stroke="#4f46e5" stroke-width="4" stroke-linecap="round"'
+    ' d="M16,56 C40,63 64,63 90,45"/>'
+    '<path fill="none" stroke="#4f46e5" stroke-width="6" stroke-linecap="round"'
+    ' d="M20,30 C48,16 82,16 104,27"/>'
+    '<circle cx="51" cy="53" r="10.5" fill="none" stroke="#4f46e5"'
+    ' stroke-width="2.5"/>'
+    '<path fill="none" stroke="#22d3ee" stroke-width="4.5" stroke-linecap="round"'
+    ' stroke-linejoin="round" d="M44.5,53.5 L49,58 L59,46.5"/>'
+    "</svg>"
+)
+_LOGO_IMG = (
+    '<img class="logo" alt="" aria-hidden="true" '
+    'src="data:image/svg+xml,' + urllib.parse.quote(_EYE_SVG) + '">'
+)
+
+_HEADER_HTML = f"""\
 <div id="as-header">
-  <span class="brand">Agent<b>Synth</b><span class="tag">playground</span></span>
+  <span class="brand">{_LOGO_IMG}Agent<b>Synth</b><span class="tag">playground</span></span>
   <span class="links">
     <a href="https://agentsynth.tech" target="_blank" rel="noopener">agentsynth.tech</a>
     <a href="https://agentsynth.tech/leaderboard" target="_blank" rel="noopener">Leaderboard</a>
@@ -1038,8 +1062,10 @@ footer{display:none !important}
 #as-header{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;
   gap:8px;padding:14px 4px 12px;margin-bottom:4px;
   border-bottom:1px solid var(--border-color-primary)}
-#as-header .brand{font-size:19px;font-weight:700;letter-spacing:-.01em}
+#as-header .brand{font-size:19px;font-weight:700;letter-spacing:-.01em;
+  display:inline-flex;align-items:center}
 #as-header .brand b{color:#4f46e5}
+#as-header .brand .logo{height:24px;margin-right:9px}
 #as-header .tag{margin-left:10px;font-size:12px;font-weight:600;color:#4f46e5;
   background:#eef0fe;padding:3px 10px;border-radius:999px;vertical-align:2px}
 #as-header .links a{margin-left:18px;font-size:14px;color:#5b6471;text-decoration:none}
@@ -1539,4 +1565,7 @@ with gr.Blocks(title="AgentSynth — playground", **_BLOCKS_KW) as demo:
 
 
 if __name__ == "__main__":
-    demo.launch(**(_STYLE_KW if _GRADIO_6 else {}))
+    _launch_kw = dict(_STYLE_KW) if _GRADIO_6 else {}
+    if os.path.exists("assets/favicon.svg"):
+        _launch_kw["favicon_path"] = "assets/favicon.svg"
+    demo.launch(**_launch_kw)

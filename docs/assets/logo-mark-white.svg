@@ -1,0 +1,10 @@
+<svg width="128" height="84" viewBox="0 0 128 84" fill="none" color="#ffffff" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="AgentSynth">
+  <title>AgentSynth</title>
+  <g>
+    <path fill="currentColor" d="M16,56 C34,41 58,34 80,36 C92,37 103,38 111,33 C105,39 97,45 90,45 C66,46 40,50 16,56 Z"/>
+    <path fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" d="M16,56 C40,63 64,63 90,45"/>
+    <path fill="none" stroke="currentColor" stroke-width="6" stroke-linecap="round" d="M20,30 C48,16 82,16 104,27"/>
+    <circle cx="51" cy="53" r="10.5" fill="none" stroke="currentColor" stroke-width="2.5"/>
+    <path fill="none" stroke="#c7f9ff" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round" d="M44.5,53.5 L49,58 L59,46.5"/>
+  </g>
+</svg>

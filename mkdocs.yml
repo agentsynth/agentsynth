@@ -7,6 +7,8 @@ docs_dir: docs
 
 theme:
   name: material
+  logo: assets/logo-mark-white.svg
+  favicon: assets/favicon.svg
   palette:
     - scheme: default
       primary: indigo

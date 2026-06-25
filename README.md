@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/logo.svg" alt="AgentSynth" width="92">
+</p>
+
 # AgentSynth
 
 > Generate synthetic agent trajectories, **verify them against the world's end state**, and turn outcome-checked packs into a live leaderboard, RL rewards, and a CI gate for your agents. Offline-first, MIT-licensed.
