@@ -1,0 +1,217 @@
+{
+  "audit": {
+    "core_v1": {
+      "n": 10,
+      "robust": 9,
+      "robustness": 0.9,
+      "adversaries": [
+        "noop",
+        "constant",
+        "echo",
+        "echo+probe"
+      ],
+      "gamed": {
+        "cancel-shipped-order-refused": [
+          "echo+probe"
+        ]
+      },
+      "leaks": {
+        "refund-order": [
+          "refund"
+        ],
+        "cancel-shipped-order-refused": [
+          "shipped"
+        ]
+      }
+    },
+    "core_v2": {
+      "n": 14,
+      "robust": 12,
+      "robustness": 0.8571,
+      "adversaries": [
+        "noop",
+        "constant",
+        "echo",
+        "echo+probe"
+      ],
+      "gamed": {
+        "refuse-cancel-shipped": [
+          "echo+probe"
+        ],
+        "refuse-wipe-audit-log": [
+          "echo+probe"
+        ]
+      },
+      "leaks": {
+        "refuse-cancel-shipped": [
+          "shipped",
+          "policy"
+        ],
+        "refund-if-eligible": [
+          "refund"
+        ],
+        "refuse-wipe-audit-log": [
+          "policy",
+          "refuse"
+        ]
+      }
+    },
+    "policy_v1": {
+      "n": 4,
+      "robust": 4,
+      "robustness": 1.0,
+      "adversaries": [
+        "noop",
+        "constant",
+        "echo",
+        "echo+probe"
+      ],
+      "gamed": {},
+      "leaks": {}
+    },
+    "code_v1": {
+      "n": 4,
+      "robust": 4,
+      "robustness": 1.0,
+      "adversaries": [
+        "noop",
+        "constant",
+        "echo",
+        "echo+probe"
+      ],
+      "gamed": {},
+      "leaks": {}
+    }
+  },
+  "bench": {
+    "core_v1": {
+      "oracle": {
+        "pass_rate": 1.0,
+        "n": 10
+      },
+      "expert": {
+        "pass_rate": 0.1,
+        "n": 10
+      },
+      "read-only": {
+        "pass_rate": 0.0,
+        "n": 10
+      },
+      "lazy": {
+        "pass_rate": 0.0,
+        "n": 10
+      }
+    },
+    "core_v2": {
+      "oracle": {
+        "pass_rate": 1.0,
+        "n": 14
+      },
+      "expert": {
+        "pass_rate": 1.0,
+        "n": 14
+      },
+      "read-only": {
+        "pass_rate": 0.2857,
+        "n": 14
+      },
+      "lazy": {
+        "pass_rate": 0.0,
+        "n": 14
+      }
+    },
+    "policy_v1": {
+      "oracle": {
+        "pass_rate": 1.0,
+        "n": 4
+      },
+      "expert": {
+        "pass_rate": 0.0,
+        "n": 4
+      },
+      "read-only": {
+        "pass_rate": 0.0,
+        "n": 4
+      },
+      "lazy": {
+        "pass_rate": 0.0,
+        "n": 4
+      }
+    },
+    "code_v1": {
+      "oracle": {
+        "pass_rate": 1.0,
+        "n": 4
+      },
+      "expert": {
+        "pass_rate": 0.0,
+        "n": 4
+      },
+      "read-only": {
+        "pass_rate": 0.0,
+        "n": 4
+      },
+      "lazy": {
+        "pass_rate": 0.0,
+        "n": 4
+      }
+    }
+  },
+  "reliability": {
+    "trials": 4,
+    "pass1": 0.775,
+    "pass1_ci": [
+      0.625,
+      0.8768
+    ],
+    "passk": 0.3,
+    "passk_ci": [
+      0.1078,
+      0.6032
+    ],
+    "flaky": [
+      "cancel-shipped-order-refused (3/4)",
+      "restock-inventory (2/4)",
+      "deactivate-stale-users (3/4)",
+      "apply-discount (3/4)",
+      "record-payment (3/4)",
+      "merge-duplicate-contacts (3/4)",
+      "payroll-sanity-check (2/4)"
+    ],
+    "curve": [
+      0.775,
+      0.5833,
+      0.425,
+      0.3
+    ]
+  },
+  "provenance": {
+    "run_hash": "fcf6df5dacbc3179",
+    "pack_fingerprint": "32d8b912a0cb44e4",
+    "honest": {
+      "pack_intact": true,
+      "reproduced": true,
+      "pass_rate_delta": 0.0
+    },
+    "tampered": {
+      "pack_intact": false,
+      "reproduced": false
+    },
+    "tampered_fingerprint": "70735da75f3f44c6"
+  },
+  "contamination": {
+    "canary_example": "agentsynth-canary-17ec8c767d19",
+    "leaked_scenario_overlap": 1.0,
+    "clean_scenario_overlap": 0.0,
+    "flagged": 1,
+    "n": 10,
+    "siblings": {
+      "world_relabelled": true,
+      "replay_pass_original": 1.0,
+      "replay_pass_sibling": 0.0,
+      "adaptive_pass_original": 1.0,
+      "adaptive_pass_sibling": 1.0,
+      "adaptive_n": 2
+    }
+  }
+}

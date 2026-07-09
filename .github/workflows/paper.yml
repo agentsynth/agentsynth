@@ -1,0 +1,37 @@
+name: Paper
+
+on:
+  push:
+    branches: [main]
+    paths: ["paper/**"]
+  pull_request:
+    paths: ["paper/**"]
+
+jobs:
+  numbers:
+    name: numbers reproduce
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -e .
+      - run: python paper/experiments.py > /dev/null
+      # the committed numbers must match what the code actually produces
+      - run: git diff --exit-code paper/numbers.json
+
+  pdf:
+    name: build pdf
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: wtfjoke/setup-tectonic@v3
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - run: tectonic paper/main.tex
+      - uses: actions/upload-artifact@v4
+        with:
+          name: agentsynth-report
+          path: paper/main.pdf

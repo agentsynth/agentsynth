@@ -53,3 +53,6 @@ cloud/
 hub.db
 test_hub.db
 .claude/
+
+# paper build output (CI compiles the PDF; sources are what we version)
+paper/main.pdf
