@@ -1,0 +1,25 @@
+cff-version: 1.2.0
+message: If AgentSynth is part of your research, please cite it as below.
+title: "AgentSynth: outcome-verified benchmarks and synthetic trajectories for LLM agents"
+type: software
+authors:
+  - name: AgentSynth contributors
+repository-code: https://github.com/agentsynth/agentsynth
+url: https://agentsynth.tech
+license: MIT
+version: 0.9.0
+date-released: "2026-06-23"
+abstract: >-
+  AgentSynth generates synthetic multi-turn agent trajectories and verifies them
+  against the world's end state rather than the transcript. Scenario packs double
+  as benchmarks with reward-hacking audits, contamination canaries, pass^k
+  reliability, and reproducible run manifests, and export to the verifiers and
+  OpenEnv ecosystems for RL training.
+keywords:
+  - llm-agents
+  - benchmark
+  - evaluation
+  - reinforcement-learning
+  - verifiable-rewards
+  - synthetic-data
+  - reproducibility
