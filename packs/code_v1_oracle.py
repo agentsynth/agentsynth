@@ -1,7 +1,7 @@
 """Reference solution for the code_v1 pack: one `python` tool call per task.
 
-    agentsynth bench --pack packs/code_v1.yaml --policy packs.code_v1_oracle:solve
-    agentsynth pack validate packs/code_v1.yaml
+agentsynth bench --pack packs/code_v1.yaml --policy packs.code_v1_oracle:solve
+agentsynth pack validate packs/code_v1.yaml
 """
 
 # Each solution is defined in a single python call; the hidden tests run it afterwards.

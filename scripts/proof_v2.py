@@ -147,8 +147,7 @@ def main(argv=None) -> int:
         args.n, model=args.model, out_dir=args.out, seed=args.seed, budget_usd=args.budget_usd
     )
     print(
-        f"kept {summary['kept']}/{summary['requested']} verified trajectories "
-        f"-> {summary['jsonl']}"
+        f"kept {summary['kept']}/{summary['requested']} verified trajectories -> {summary['jsonl']}"
     )
     print(f"card: {summary['card']}  manifest: {os.path.join(args.out, 'manifest.json')}")
     return 0

@@ -79,8 +79,7 @@ class ReliabilityReport(BaseModel):
         lines = [
             f"Reliability over {self.trials} trials, {self.n_scenarios} scenarios:",
             f"- pass^1 (any single attempt): {self.pass1:.0%}  (95% CI {lo1:.0%}–{hi1:.0%})",
-            f"- pass^{self.trials} (every attempt): {self.passk:.0%} "
-            f" (95% CI {lok:.0%}–{hik:.0%})",
+            f"- pass^{self.trials} (every attempt): {self.passk:.0%}  (95% CI {lok:.0%}–{hik:.0%})",
             f"- decay pass^1..pass^{self.trials}: {decay}",
         ]
         flaky = self.flaky

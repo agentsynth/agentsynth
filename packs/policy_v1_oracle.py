@@ -1,7 +1,7 @@
 """Reference solution for the policy_v1 pack — apply the policy, one statement per call.
 
-    agentsynth bench --pack packs/policy_v1.yaml --policy packs.policy_v1_oracle:solve
-    agentsynth pack validate packs/policy_v1.yaml
+agentsynth bench --pack packs/policy_v1.yaml --policy packs.policy_v1_oracle:solve
+agentsynth pack validate packs/policy_v1.yaml
 """
 
 # Each plan: inspect -> apply the policy -> read it back.

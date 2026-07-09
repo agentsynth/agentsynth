@@ -145,9 +145,7 @@ class RobustnessReport(BaseModel):
             gamed = ", ".join(row.gamed_by) if row.gamed_by else "—"
             leaks = ", ".join(row.answer_leaks) if row.answer_leaks else "—"
             asserts_change = "no" if row.state_noop_satisfiable else "yes"
-            lines.append(
-                f"| {row.scenario_id} | {gamed} | {leaks} | {asserts_change} |"
-            )
+            lines.append(f"| {row.scenario_id} | {gamed} | {leaks} | {asserts_change} |")
         weak = [r for r in self.rows if not r.robust or r.answer_leaks]
         if weak:
             lines.append("")
@@ -265,8 +263,7 @@ def perturb_scenario(scenario: Any, seed: int = 0) -> Any:
     data["id"] = f"{scenario.id}~perturbed"
     data["task"] = swap(scenario.task)
     data["environment"]["rows"] = [
-        [mapping.get(cell, cell) if isinstance(cell, str) else cell for cell in row]
-        for row in rows
+        [mapping.get(cell, cell) if isinstance(cell, str) else cell for cell in row] for row in rows
     ]
 
     new_checkers: List[Dict[str, Any]] = []
