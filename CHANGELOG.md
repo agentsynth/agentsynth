@@ -6,6 +6,28 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Bench an agent that lives outside this process (`agentsynth.agents`). `bench --agent
+  "python my_agent.py"` sends one JSON object per step (task, tool catalog, newest
+  observation, transcript) over stdin/stdout and reads one action back; `--agent
+  http://…` POSTs the same payload to an endpoint. Any language, any framework, no SDK —
+  one-shot scripts are respawned per step, replies that aren't JSON grade as final
+  answers instead of crashing the run, and `--agent-timeout` bounds each step.
+  `examples/stdio_agent.py` and `examples/http_agent.py` are working starters.
+- `agentsynth serve-mcp --pack …` exposes a pack over MCP stdio: an MCP agent (Claude
+  Code, Claude Desktop, anything speaking the protocol) reads `current_task`, acts
+  through the environment's real tools, and closes each scenario with `submit_answer`;
+  checkers score the world's end state and the final reply carries the pack report.
+- `agentsynth diff before.json after.json` compares two run manifests (or `bench
+  --json` reports) and names what regressed, what got fixed, and what's still failing.
+  Exits 1 on regressions so it drops straight into CI; `--ok` for report-only mode.
+
+### Changed
+
+- `bench --compare` accepts `http(s)://` agent endpoints alongside model ids and
+  policy refs.
+
 ## [0.9.0] - 2026-06-23
 
 ### Added

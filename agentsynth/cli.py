@@ -26,7 +26,7 @@ def _build_parser() -> argparse.ArgumentParser:
         ),
     )
     sub = parser.add_subparsers(
-        dest="command", metavar="{generate,eval,import,flywheel,bench,pack}"
+        dest="command", metavar="{generate,eval,import,flywheel,bench,diff,serve-mcp,pack}"
     )
 
     gen = sub.add_parser(
@@ -165,11 +165,26 @@ def _build_parser() -> argparse.ArgumentParser:
         help="A custom policy instead of --model, e.g. mypkg.policies:my_policy.",
     )
     bench.add_argument(
+        "--agent",
+        default=None,
+        metavar="CMD|URL",
+        help="Bench an agent outside this process: a command speaking one JSON "
+        "line per step over stdio ('python my_agent.py'), or an http(s) endpoint "
+        "receiving the same payload as POST.",
+    )
+    bench.add_argument(
+        "--agent-timeout",
+        type=float,
+        default=120.0,
+        metavar="SECONDS",
+        help="How long to wait for each --agent reply (default: 120).",
+    )
+    bench.add_argument(
         "--compare",
         default=None,
         metavar="ITEMS",
-        help="Comma-separated model ids and/or policy refs to run side by side, "
-        "e.g. gpt-4o-mini,my_agent.py:solve.",
+        help="Comma-separated model ids, policy refs, and/or agent URLs to run "
+        "side by side, e.g. gpt-4o-mini,my_agent.py:solve,http://localhost:8088/act.",
     )
     bench.add_argument("--seed", type=int, default=7)
     bench.add_argument(
@@ -203,6 +218,43 @@ def _build_parser() -> argparse.ArgumentParser:
         default=None,
         metavar="PATH",
         help="Write the full report as JSON — for CI gates and analysis.",
+    )
+
+    diff = sub.add_parser(
+        "diff",
+        help="Compare two bench runs and flag regressions.",
+        description="Diff two run manifests (or bench --json reports) of the same "
+        "pack: which scenarios regressed, which got fixed. Exits 1 on regressions, "
+        "so it works as a CI gate.",
+    )
+    diff.add_argument("before", metavar="BEFORE.json", help="The baseline run.")
+    diff.add_argument("after", metavar="AFTER.json", help="The candidate run.")
+    diff.add_argument(
+        "--ok",
+        action="store_true",
+        help="Always exit 0, even when scenarios regressed (report-only mode).",
+    )
+
+    serve = sub.add_parser(
+        "serve-mcp",
+        help="Serve a pack over MCP stdio, so an MCP agent can be benched on it.",
+        description="Expose a pack's worlds as MCP tools. Wire the command into "
+        "Claude Code / Claude Desktop / any MCP client; the agent reads the task "
+        "with current_task, acts through the environment tools, and ends each "
+        "scenario with submit_answer — checkers run on the world's end state.",
+    )
+    serve.add_argument(
+        "--pack",
+        default="core_v1",
+        metavar="PACK",
+        help="Pack name, file, or URL (default: core_v1).",
+    )
+    serve.add_argument("--seed", type=int, default=7)
+    serve.add_argument(
+        "--hub",
+        default="https://api.agentsynth.tech",
+        metavar="URL",
+        help="Hub used for by-name packs.",
     )
 
     pack = sub.add_parser(
@@ -326,8 +378,11 @@ def _build_parser() -> argparse.ArgumentParser:
         "manifest", metavar="MANIFEST.json", help="A run manifest (or a bench --json report)."
     )
     pack_verify.add_argument(
-        "--pack", default=None, metavar="PACK", help="Pack to check against (default: the "
-        "manifest's pack_id, resolved locally or from the hub)."
+        "--pack",
+        default=None,
+        metavar="PACK",
+        help="Pack to check against (default: the "
+        "manifest's pack_id, resolved locally or from the hub).",
     )
     pack_verify.add_argument("--policy", default=None, metavar="REF", help="Policy module:fn.")
     pack_verify.add_argument("--model", default=None, metavar="ID", help="Or a LiteLLM model id.")
@@ -526,11 +581,18 @@ def _policy_from_model(model: str):
 
 
 def _resolve_policy(args: argparse.Namespace):
+    if args.agent:
+        from .agents import agent_policy
+
+        return agent_policy(args.agent, timeout=args.agent_timeout)
     if args.policy:
         return _load_policy_ref(args.policy)
     if args.model:
         return _policy_from_model(args.model)
-    raise SystemExit("error: pass --model <litellm id>, --policy module:function, or --compare a,b")
+    raise SystemExit(
+        "error: pass --model <litellm id>, --policy module:function, "
+        "--agent <cmd or url>, or --compare a,b"
+    )
 
 
 def _load_pack(pack: str, hub: str):
@@ -595,8 +657,20 @@ def _cmd_bench_compare(args: argparse.Namespace, scenarios, pack_id: str) -> int
     trials = max(1, int(args.trials))
     runs = []
     for item in items:
-        policy = _load_policy_ref(item) if ":" in item else _policy_from_model(item)
-        report, pass1_avg = _run_trials(policy, scenarios, args.seed, trials)
+        if item.startswith(("http://", "https://")):
+            from .agents import agent_policy
+
+            policy = agent_policy(item, timeout=args.agent_timeout)
+        elif ":" in item:
+            policy = _load_policy_ref(item)
+        else:
+            policy = _policy_from_model(item)
+        try:
+            report, pass1_avg = _run_trials(policy, scenarios, args.seed, trials)
+        finally:
+            close = getattr(policy, "close", None)
+            if callable(close):
+                close()
         runs.append({"name": item, "pass1_avg": pass1_avg, "report": report})
 
     def disp(name: str) -> str:
@@ -667,7 +741,12 @@ def _cmd_bench(args: argparse.Namespace) -> int:
 
     trials = max(1, int(args.trials))
     t0 = time.perf_counter()
-    reports = [run_scenario_suite(policy, scenarios, seed=args.seed + t) for t in range(trials)]
+    try:
+        reports = [run_scenario_suite(policy, scenarios, seed=args.seed + t) for t in range(trials)]
+    finally:
+        close = getattr(policy, "close", None)
+        if callable(close):
+            close()
     elapsed = time.perf_counter() - t0
     pass1_avg = None
     rel = None
@@ -712,13 +791,12 @@ def _cmd_bench(args: argparse.Namespace) -> int:
         runs_total = report.n * trials
         if runs_total:
             print(
-                f"throughput: {runs_total} runs in {elapsed:.1f}s "
-                f"({elapsed / runs_total:.3f}s/run)"
+                f"throughput: {runs_total} runs in {elapsed:.1f}s ({elapsed / runs_total:.3f}s/run)"
             )
 
     from .provenance import run_manifest
 
-    bench_name = args.name or args.model or args.policy or "anonymous"
+    bench_name = args.name or args.model or args.policy or args.agent or "anonymous"
     manifest = run_manifest(
         pack_id, scenarios, report, model=bench_name, seed=args.seed, trials=trials
     )
@@ -763,6 +841,69 @@ def _cmd_bench(args: argparse.Namespace) -> int:
         url = (args.submit or args.hub).rstrip("/") + "/v1/submissions"
         print(f"submitting to {url} ...")
         print(_post_json(url, payload))
+    return 0
+
+
+def _cmd_serve_mcp(args: argparse.Namespace) -> int:
+    try:
+        import mcp  # noqa: F401
+    except ImportError:
+        raise SystemExit(
+            "error: MCP serving needs `pip install 'agentsynth-ai[mcp]'` (Python 3.10+)"
+        )
+    from .mcp_serve import serve_stdio
+
+    scenarios, pack_id = _load_pack(args.pack, args.hub)
+    # stdout is the MCP transport; anything human-facing goes to stderr
+    print(
+        f"serving pack {pack_id} ({len(scenarios)} scenarios) over MCP stdio ...",
+        file=sys.stderr,
+    )
+    serve_stdio(scenarios, seed=args.seed)
+    return 0
+
+
+def _read_run_manifest(path: str) -> Dict[str, Any]:
+    """Load a run manifest — raw, or embedded in a `bench --json` report."""
+    import json
+
+    if not os.path.exists(path):
+        raise SystemExit(f"error: manifest not found: '{path}'")
+    with open(path, encoding="utf-8") as fh:
+        data = json.load(fh)
+    if isinstance(data, dict) and "run_hash" not in data and isinstance(data.get("manifest"), dict):
+        data = data["manifest"]
+    if not isinstance(data, dict) or "results" not in data:
+        raise SystemExit(f"error: no run manifest in '{path}'")
+    return data
+
+
+def _cmd_diff(args: argparse.Namespace) -> int:
+    from .provenance import diff_runs
+
+    before = _read_run_manifest(args.before)
+    after = _read_run_manifest(args.after)
+    delta = diff_runs(before, after)
+
+    if not delta["same_pack"]:
+        print("warning: the two runs used different pack contents — read with care")
+    print(
+        f"pass rate: {delta['pass_rate_before']} ({before.get('policy', '?')}) "
+        f"-> {delta['pass_rate_after']} ({after.get('policy', '?')})"
+    )
+    for key, mark in (("regressed", "-"), ("fixed", "+"), ("still_failing", "x")):
+        for sid in delta[key]:
+            print(f"  {mark} {sid}  [{key.replace('_', ' ')}]")
+    for key in ("added", "removed"):
+        for sid in delta[key]:
+            print(f"  ~ {sid}  [{key} scenario]")
+    if not any(delta[k] for k in ("regressed", "fixed", "still_failing", "added", "removed")):
+        print("  no per-scenario changes")
+
+    if delta["regressed"]:
+        print(f"\n{len(delta['regressed'])} regression(s)")
+        return 0 if args.ok else 1
+    print("\nno regressions")
     return 0
 
 
@@ -1330,20 +1471,11 @@ def _cmd_pack_contamination(args: argparse.Namespace) -> int:
 
 
 def _cmd_pack_verify_run(args: argparse.Namespace) -> int:
-    import json
 
     from .provenance import verify_run
 
-    if not os.path.exists(args.manifest):
-        raise SystemExit(f"error: manifest not found: '{args.manifest}'")
-    with open(args.manifest, encoding="utf-8") as fh:
-        data = json.load(fh)
-    # accept a raw manifest or a `bench --json` report that embeds one
-    if isinstance(data, dict) and "run_hash" not in data and isinstance(data.get("manifest"), dict):
-        manifest = data["manifest"]
-    else:
-        manifest = data
-    if not isinstance(manifest, dict) or "run_hash" not in manifest:
+    manifest = _read_run_manifest(args.manifest)
+    if "run_hash" not in manifest:
         raise SystemExit("error: no run manifest in that file")
 
     pack_ref = args.pack or manifest.get("pack_id")
@@ -1386,10 +1518,7 @@ def _cmd_pack(args: argparse.Namespace) -> int:
         return _cmd_pack_contamination(args)
     if args.pack_command == "verify-run":
         return _cmd_pack_verify_run(args)
-    print(
-        "usage: agentsynth pack "
-        "{new,validate,teach,audit,export,contamination,verify-run} ..."
-    )
+    print("usage: agentsynth pack {new,validate,teach,audit,export,contamination,verify-run} ...")
     return 1
 
 
@@ -1458,6 +1587,10 @@ def main(argv: Optional[List[str]] = None) -> int:
         return _cmd_flywheel(args)
     if args.command == "bench":
         return _cmd_bench(args)
+    if args.command == "diff":
+        return _cmd_diff(args)
+    if args.command == "serve-mcp":
+        return _cmd_serve_mcp(args)
     if args.command == "pack":
         return _cmd_pack(args)
 

@@ -135,8 +135,33 @@ def verify_run(
     }
 
 
+def diff_runs(before: Dict[str, Any], after: Dict[str, Any]) -> Dict[str, Any]:
+    """What changed between two bench manifests of the same pack.
+
+    `regressed` is the list that should fail a CI gate: scenarios that passed
+    before and fail now. Scenarios only present on one side land in `added` /
+    `removed` rather than silently skewing the counts.
+    """
+    rows_a = {r["id"]: r for r in before.get("results", [])}
+    rows_b = {r["id"]: r for r in after.get("results", [])}
+    shared = sorted(set(rows_a) & set(rows_b))
+    regressed = [i for i in shared if rows_a[i]["passed"] and not rows_b[i]["passed"]]
+    fixed = [i for i in shared if not rows_a[i]["passed"] and rows_b[i]["passed"]]
+    return {
+        "same_pack": before.get("pack_fingerprint") == after.get("pack_fingerprint"),
+        "pass_rate_before": before.get("pass_rate"),
+        "pass_rate_after": after.get("pass_rate"),
+        "regressed": regressed,
+        "fixed": fixed,
+        "still_failing": [i for i in shared if not rows_a[i]["passed"] and not rows_b[i]["passed"]],
+        "added": sorted(set(rows_b) - set(rows_a)),
+        "removed": sorted(set(rows_a) - set(rows_b)),
+    }
+
+
 __all__ = [
     "content_hash",
+    "diff_runs",
     "pack_fingerprint",
     "run_hash",
     "run_manifest",

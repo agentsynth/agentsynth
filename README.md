@@ -63,6 +63,7 @@ Watch a policy work an outcome-checked world step by step, line policies up on a
 - **Generate + a 6-dimension judge** — single-agent, multi-agent, and code-execution modes, scored on task completion, tool correctness, faithfulness, reasoning, efficiency, and safety, with a deterministic mock fallback.
 - **7 real environments** — SQL, Python sandbox, Docker, MCP, headless browser, REST/OpenAPI, and Composite. Tool calls execute for real.
 - **RL-native (RLVR)** — any scenario is a gym whose terminal reward is the world-state verdict, with a TRL `GRPOTrainer`-compatible reward function and an OpenEnv bridge.
+- **Bench any agent as-is** — `bench --agent` speaks one JSON line per step to your process (any language) or POSTs it to your HTTP endpoint; `serve-mcp` exposes a pack to any MCP client (Claude Code, Claude Desktop); `agentsynth diff` turns two runs into a named-regression CI gate.
 - **Bring your own loop** — `to_openai_tools` / `action_from_openai_tool_call` drive the gym straight from an OpenAI-style agent (OpenAI SDK, LangGraph, CrewAI) with no rewrite.
 - **Import production traces** — OpenAI / Anthropic / OpenTelemetry logs become verifiable trajectories; `--redact` strips secrets first.
 - **Industrial scale** — disk cache, a hard budget cap, resumable runs, MinHash dedup, and JSONL / ShareGPT / ADP export.
@@ -521,6 +522,35 @@ gentler starter.
 it inspects, acts, then verifies, and `agentsynth pack teach` exports its episodes
 as gold trajectories for SFT seeding.
 
+### Bench your agent as-is — any language, no rewrite
+
+Your agent stays a black box. Each step the bench sends one JSON object — the
+task, the tool catalog, the newest observation, the transcript so far — and
+reads one action back: `{"tool": ..., "args": {...}}` or `{"answer": "..."}`.
+That's the whole contract:
+
+```bash
+agentsynth bench --pack core_v2 --agent "python examples/stdio_agent.py"  # stdin/stdout
+agentsynth bench --pack core_v2 --agent http://localhost:8088/act         # your HTTP service
+```
+
+[`examples/stdio_agent.py`](examples/stdio_agent.py) is the read-a-line,
+print-a-line loop in twenty lines; [`examples/http_agent.py`](examples/http_agent.py)
+is the same brain behind a POST endpoint. Scripts that exit after one reply are
+respawned per step, so quick hacks work too. Everything else — `--trials`,
+`--compare`, `--submit`, the run manifest — behaves exactly as with `--model`.
+
+An MCP agent needs even less: serve the pack and wire it into Claude Code,
+Claude Desktop, or any MCP client —
+
+```bash
+agentsynth serve-mcp --pack core_v1
+```
+
+the agent reads `current_task`, acts through the environment's real tools, and
+closes each scenario with `submit_answer`; checkers score the world's end state
+and the final reply carries the whole pack report.
+
 ### Bring your own agent loop
 
 If your agent already speaks OpenAI function calling (the OpenAI SDK, LangGraph,
@@ -585,7 +615,14 @@ as a GitHub Action that fails the job when reliability drops below a floor:
 ```
 
 `agentsynth bench --json report.json` writes the same machine-readable report
-for custom pipelines.
+for custom pipelines, and `agentsynth diff` turns two of them into a regression
+gate that names exactly which scenarios a change broke:
+
+```bash
+agentsynth bench --pack core_v2 --agent "python agent.py" --json main.json   # on main
+agentsynth bench --pack core_v2 --agent "python agent.py" --json pr.json     # on the PR
+agentsynth diff main.json pr.json    # exits 1 and lists the regressions
+```
 
 ### Import your production traces
 
