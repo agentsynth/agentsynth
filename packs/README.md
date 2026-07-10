@@ -50,3 +50,31 @@ everyone, and it gets its own leaderboard at
 Good packs read like real work in your domain: a handful of tables, tasks with
 a state change to verify, at least one "policy says no" scenario, and answer
 checks that catch silent failures.
+
+## Publishing to the RL environment ecosystems
+
+A pack's checkers are already a verifiable reward, so it exports mechanically:
+
+```bash
+agentsynth pack export packs/core_v2.yaml --format verifiers --out dist/core_v2-verifiers
+agentsynth pack export packs/core_v2.yaml --format openenv   --out dist/core_v2-openenv
+```
+
+Each writes a self-contained folder (the pack, a generated environment module,
+`pyproject.toml`, a README, `manifest.json`) — verified to build and load clean
+before every release, so what's in `dist/` is what you'd actually publish, not
+a draft.
+
+Getting it onto the Hub is a step only a maintainer with the right account can
+take:
+
+- **Prime Intellect Environments Hub** — install the [`prime` CLI](https://github.com/PrimeIntellect-ai/prime),
+  `prime login`, then `prime env push --path dist/core_v2-verifiers`. Requires
+  a Prime Intellect account.
+- **OpenEnv** — the [contribution guide](https://meta-pytorch.org/OpenEnv/environment-builder/)
+  asks you to open an issue or claim one before a PR, then `openenv build` /
+  `openenv validate` / `openenv push` from `dist/core_v2-openenv`, and add the
+  environment to the Docker build matrix. Their process, their review.
+
+Both are one-way doors (a public listing under an account, or a PR to someone
+else's repo) — worth a maintainer's deliberate push, not something to automate.

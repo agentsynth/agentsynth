@@ -35,6 +35,7 @@ nav:
   - Vision: VISION.md
   - Architecture: ARCHITECTURE.md
   - Fine-tune & benchmark: BENCHMARK.md
+  - Robustness report: ROBUSTNESS_REPORT.md
   - Migrating from OpenAI Evals: migrate-from-openai-evals.md
   - Manifesto: MANIFESTO.md
   - API reference: reference.md

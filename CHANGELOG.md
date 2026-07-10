@@ -35,6 +35,12 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   hosted Evals platform shuts down November 30, 2026; a concept map and two worked
   examples for evals that are really testing an agent (tool use, state), not
   single-turn text output.
+- [`docs/ROBUSTNESS_REPORT.md`](docs/ROBUSTNESS_REPORT.md) — `pack audit` run against
+  every pack we ship, weaknesses named, in the context of the Berkeley RDI benchmark
+  exploits. Numbers pulled straight from `paper/numbers.json`, so this can't drift
+  from what the code actually finds. `packs/README.md` gained a "Publishing to the
+  RL environment ecosystems" section documenting `pack export` → `prime env push` /
+  OpenEnv's PR flow.
 
 ### Changed
 
