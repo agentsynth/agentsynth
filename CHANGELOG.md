@@ -31,6 +31,10 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `/v1/submissions/{id}` JSON endpoint) showing the full per-scenario pass/fail, not
   just the aggregate pass rate — the leaderboard's reproducible checkmark now links
   there.
+- [`docs/migrate-from-openai-evals.md`](docs/migrate-from-openai-evals.md) — OpenAI's
+  hosted Evals platform shuts down November 30, 2026; a concept map and two worked
+  examples for evals that are really testing an agent (tool use, state), not
+  single-turn text output.
 
 ### Changed
 

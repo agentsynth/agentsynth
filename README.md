@@ -21,7 +21,8 @@
   <a href="docs/VISION.md">Vision</a> ·
   <a href="docs/ARCHITECTURE.md">Architecture</a> ·
   <a href="ROADMAP.md">Roadmap</a> ·
-  <a href="CONTRIBUTING.md">Contributing</a>
+  <a href="CONTRIBUTING.md">Contributing</a> ·
+  <a href="docs/migrate-from-openai-evals.md">Migrating from OpenAI Evals</a>
 </p>
 
 <p align="center">
