@@ -32,7 +32,7 @@ if the checker looks at the world and the world didn't change.
 
 | OpenAI Evals | AgentSynth | Notes |
 | --- | --- | --- |
-| `data_source_config` (dataset items) | a [`Scenario`](../packs/README.md)'s `environment` | Not a static dataset row — a *live* environment (SQL rows, a sandbox, a REST fixture) the agent actually acts on. |
+| `data_source_config` (dataset items) | a [`Scenario`](https://github.com/agentsynth/agentsynth/blob/main/packs/README.md)'s `environment` | Not a static dataset row — a *live* environment (SQL rows, a sandbox, a REST fixture) the agent actually acts on. |
 | `string_check` grader (`eq`/`like`/`ilike`) | `AnswerContains` checker | Same idea (does the output contain/equal a string) and the same weakness — `agentsynth pack audit` flags these as text-graded, gameable by a policy that echoes the prompt. Prefer a state check below when the task has any state to check. |
 | `text_similarity` grader (cosine/BLEU/ROUGE/fuzzy) | *(no equivalent, by design)* | Similarity-to-reference-text scoring is exactly the kind of soft signal outcome verification exists to avoid. If the task has a real answer, check the state it produced; if it's genuinely open-ended prose, that's a judged dimension, not a benchmark score — see below. |
 | `score_model` / `label_model` (LLM-as-judge) | the trajectory judge (`TrajectoryEvaluator`) | Runs and reports, but carries **zero weight** in `bench` pass/fail — it's a quality signal for dataset curation (SFT filtering), not a source of truth for whether a benchmark scenario passed. `agentsynth pack audit` exists because judged/text-graded scoring is gameable; outcome checks aren't. |
