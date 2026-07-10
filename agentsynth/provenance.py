@@ -73,13 +73,19 @@ def run_manifest(
     seed: int,
     trials: int = 1,
     version: Optional[str] = None,
+    cost: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
-    """Everything needed to reproduce and check a bench run."""
+    """Everything needed to reproduce and check a bench run.
+
+    `cost` (calls/tokens/usd from a `CostMeter`, when the policy is a metered LLM
+    client) rides along as telemetry but is deliberately NOT a `run_hash` input —
+    reproducing a run means matching its outcomes, not its exact spend.
+    """
     if version is None:
         from . import __version__ as version
     pack_fp = pack_fingerprint(scenarios)
     rows = _result_rows(report)
-    return {
+    manifest = {
         "pack_id": pack_id,
         "pack_fingerprint": pack_fp,
         "policy": model,
@@ -92,6 +98,9 @@ def run_manifest(
         "results": rows,
         "run_hash": run_hash(pack_fp, model, seed, trials, rows),
     }
+    if cost:
+        manifest["cost"] = cost
+    return manifest
 
 
 def verify_run(

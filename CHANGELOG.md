@@ -22,6 +22,15 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `agentsynth diff before.json after.json` compares two run manifests (or `bench
   --json` reports) and names what regressed, what got fixed, and what's still failing.
   Exits 1 on regressions so it drops straight into CI; `--ok` for report-only mode.
+- Cost telemetry on the leaderboard. `bench --model …` now folds a run's spend (calls,
+  tokens, USD, from the existing `CostMeter`) into the run manifest as `cost` — not a
+  `run_hash` input, since reproducing a score is about outcomes, not exact spend. The
+  hub stores it and shows a cost column on the leaderboard, in the spirit of
+  cost-aware, not just accuracy-aware, agent evaluation (HAL).
+- Public per-scenario run logs. Every submission gets a `/runs/{id}` page (and a
+  `/v1/submissions/{id}` JSON endpoint) showing the full per-scenario pass/fail, not
+  just the aggregate pass rate — the leaderboard's reproducible checkmark now links
+  there.
 
 ### Changed
 

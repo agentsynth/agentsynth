@@ -145,3 +145,89 @@ def test_manifest_disagreeing_with_its_report_is_rejected():
         },
     )
     assert resp.status_code == 422
+
+
+def test_cost_rides_along_with_the_manifest():
+    rate = 0.7
+    resp = client.post(
+        "/v1/submissions",
+        json={
+            "pack_id": PACK_ID,
+            "model": "priced-model",
+            "report": _report(rate),
+            "manifest": {
+                "run_hash": "costed01",
+                "pack_fingerprint": "fp01",
+                "pass_rate": rate,
+                "cost": {"usd": 0.0123, "total_tokens": 4560, "calls": 7},
+            },
+        },
+    )
+    assert resp.status_code == 201, resp.text
+    submission_id = resp.json()["id"]
+
+    board = client.get("/v1/leaderboard", params={"pack": PACK_ID}).json()
+    entry = next(e for e in board["entries"] if e["model"] == "priced-model")
+    assert entry["cost_usd"] == 0.0123 and entry["cost_tokens"] == 4560
+    assert entry["id"] == submission_id
+
+    page = client.get("/leaderboard", params={"pack": PACK_ID}).text
+    assert "$0.012" in page  # rounded in the table cell
+
+
+def test_scripted_policy_submission_has_no_cost():
+    resp = client.post(
+        "/v1/submissions",
+        json={"pack_id": PACK_ID, "model": "free-policy", "report": _report(0.4)},
+    )
+    assert resp.status_code == 201, resp.text
+    board = client.get("/v1/leaderboard", params={"pack": PACK_ID}).json()
+    entry = next(e for e in board["entries"] if e["model"] == "free-policy")
+    assert entry["cost_usd"] is None
+
+    page = client.get("/leaderboard", params={"pack": PACK_ID}).text
+    assert "&mdash;" in page  # the dash placeholder renders for costless runs
+
+
+def test_submission_detail_carries_every_scenario():
+    report = _report(0.5)
+    resp = client.post(
+        "/v1/submissions",
+        json={
+            "pack_id": PACK_ID,
+            "model": "detailed-model",
+            "report": report,
+            "manifest": {
+                "run_hash": "detail01",
+                "pack_fingerprint": "fp02",
+                "pass_rate": 0.5,
+                "cost": {"usd": 0.5, "total_tokens": 100, "calls": 2},
+            },
+        },
+    )
+    submission_id = resp.json()["id"]
+
+    detail = client.get(f"/v1/submissions/{submission_id}").json()
+    assert detail["model"] == "detailed-model"
+    assert len(detail["results"]) == N == len(report["results"])
+    assert detail["reproducible"] is True
+    assert detail["cost"]["usd"] == 0.5
+
+    assert client.get("/v1/submissions/999999999").status_code == 404
+
+
+def test_run_page_renders_the_scenario_checklist():
+    resp = client.post(
+        "/v1/submissions",
+        json={"pack_id": PACK_ID, "model": "page-model", "report": _report(1.0)},
+    )
+    submission_id = resp.json()["id"]
+
+    page = client.get(f"/runs/{submission_id}").text
+    assert "page-model" in page
+    assert "s0" in page  # the fixture's scenario ids
+
+    board_page = client.get("/leaderboard", params={"pack": PACK_ID}).text
+    assert f"/runs/{submission_id}" in board_page  # the leaderboard row links here
+
+    assert client.get("/runs/999999999").status_code == 404

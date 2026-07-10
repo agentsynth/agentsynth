@@ -110,6 +110,51 @@ def test_bench_json_report(scaffold, tmp_path, capsys):
     assert report["pack_id"] == "demo_v1"
 
 
+def test_bench_folds_a_metered_policys_spend_into_the_manifest(scaffold, tmp_path, capsys):
+    # a policy carrying a pre-populated CostMeter, the shape _policy_from_model
+    # attaches for a real LLM run — exercised here without any network call.
+    pack, oracle = scaffold
+    metered = tmp_path / "metered.py"
+    metered.write_text(
+        "import importlib.util\n"
+        f"spec = importlib.util.spec_from_file_location('demo_oracle', r'{oracle}')\n"
+        "demo = importlib.util.module_from_spec(spec)\n"
+        "spec.loader.exec_module(demo)\n"
+        "from agentsynth.scale import CostMeter\n"
+        "\n"
+        "def solve(observation, gym):\n"
+        "    return demo.solve(observation, gym)\n"
+        "\n"
+        "solve.meter = CostMeter()\n"
+        "solve.meter.add(120, 40, 0.0123)\n",
+        encoding="utf-8",
+    )
+    out = tmp_path / "costed.json"
+    code = cli_main(
+        ["bench", "--pack", str(pack), "--policy", f"{metered}:solve", "--json", str(out)]
+    )
+    printed = capsys.readouterr().out
+    assert code == 0
+    assert "cost: $0.0123 (1 calls, 160 tokens)" in printed
+    report = json.loads(out.read_text())
+    assert report["cost"] == {
+        "calls": 1,
+        "prompt_tokens": 120,
+        "completion_tokens": 40,
+        "total_tokens": 160,
+        "usd": 0.0123,
+    }
+    assert report["manifest"]["cost"] == report["cost"]
+
+
+def test_bench_omits_cost_for_an_unmetered_policy(scaffold, capsys):
+    pack, oracle = scaffold
+    code = cli_main(["bench", "--pack", str(pack), "--policy", f"{oracle}:solve"])
+    printed = capsys.readouterr().out
+    assert code == 0
+    assert "cost:" not in printed
+
+
 def test_compare_runs_items_side_by_side(scaffold, tmp_path, capsys):
     pack, oracle = scaffold
     out = tmp_path / "cmp.json"

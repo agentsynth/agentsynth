@@ -577,7 +577,9 @@ def _policy_from_model(model: str):
             f"error: model '{model}' is not usable ({client.last_error}); "
             "set the provider key, or use a policy ref"
         )
-    return llm_policy(client)
+    policy = llm_policy(client)
+    policy.meter = client.meter  # type: ignore[attr-defined]  # read back to cost the manifest
+    return policy
 
 
 def _resolve_policy(args: argparse.Namespace):
@@ -797,13 +799,17 @@ def _cmd_bench(args: argparse.Namespace) -> int:
     from .provenance import run_manifest
 
     bench_name = args.name or args.model or args.policy or args.agent or "anonymous"
+    meter = getattr(policy, "meter", None)
+    cost = meter.report() if meter is not None and meter.calls else None
     manifest = run_manifest(
-        pack_id, scenarios, report, model=bench_name, seed=args.seed, trials=trials
+        pack_id, scenarios, report, model=bench_name, seed=args.seed, trials=trials, cost=cost
     )
     print(
         f"\nrun_hash {manifest['run_hash']} (pack {manifest['pack_fingerprint']}) — "
         "reproducible with `agentsynth pack verify-run`"
     )
+    if cost:
+        print(f"cost: ${cost['usd']:.4f} ({cost['calls']} calls, {cost['total_tokens']} tokens)")
 
     if args.submit is None and report.passed > 0:
         print("→ add --submit to put this run on the live leaderboard (agentsynth.tech)")
@@ -818,6 +824,7 @@ def _cmd_bench(args: argparse.Namespace) -> int:
             "trials": trials,
             "pass1_avg": pass1_avg,
             "elapsed_s": round(elapsed, 3),
+            "cost": cost,
             "reliability": rel.model_dump() if rel is not None else None,
             "manifest": manifest,
             **report.model_dump(),

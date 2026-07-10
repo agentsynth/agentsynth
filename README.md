@@ -517,7 +517,9 @@ agentsynth bench --pack core_v2 --model claude-haiku-4-5-20251001 --submit
 only when every trial passes, the reliability number single-shot benchmarks hide.
 `--compare "gpt-4o-mini,my_agent.py:solve"` runs models and your own loops side
 by side in one table. `core_v1` (10 single-table tasks) is still there as a
-gentler starter.
+gentler starter. A `--model` run's spend (calls, tokens, USD) rides along in the
+run manifest and shows as a cost column on the board; every submission's full
+per-scenario log is public at `<model> → /runs/{id}` on the leaderboard.
 [`packs/core_v2_oracle.py`](packs/core_v2_oracle.py) is the reference solution —
 it inspects, acts, then verifies, and `agentsynth pack teach` exports its episodes
 as gold trajectories for SFT seeding.

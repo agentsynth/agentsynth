@@ -88,3 +88,38 @@ def test_tolerance_accepts_a_matching_pass_rate():
     # same pass rate, exact hash — within any tolerance
     result = verify_run(manifest, scenarios, _oracle, tolerance=0.1)
     assert result["within_tolerance"] is True
+
+
+def test_cost_rides_along_without_touching_the_hash():
+    scenarios = [_refund_scenario()]
+    report = run_scenario_suite(_oracle, scenarios, seed=7)
+    bare = run_manifest("p", scenarios, report, model="oracle", seed=7, trials=1)
+    costed = run_manifest(
+        "p",
+        scenarios,
+        report,
+        model="oracle",
+        seed=7,
+        trials=1,
+        cost={"usd": 0.0123, "total_tokens": 456, "calls": 3},
+    )
+    assert "cost" not in bare
+    assert costed["cost"] == {"usd": 0.0123, "total_tokens": 456, "calls": 3}
+    # same outcomes -> same run_hash, spend isn't part of what "reproduced" means
+    assert costed["run_hash"] == bare["run_hash"]
+
+
+def test_zero_cost_is_treated_as_no_cost():
+    scenarios = [_refund_scenario()]
+    manifest = _manifest_for(scenarios, _oracle)
+    with_empty = run_manifest(
+        "p",
+        scenarios,
+        run_scenario_suite(_oracle, scenarios, seed=7),
+        model="oracle",
+        seed=7,
+        trials=1,
+        cost={},
+    )
+    assert "cost" not in with_empty
+    assert "cost" not in manifest

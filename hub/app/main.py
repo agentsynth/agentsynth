@@ -46,6 +46,11 @@ class Submission(Base):
     # fingerprint, so anyone can re-derive the score with `agentsynth pack verify-run`.
     run_hash = Column(String(64), default="")
     pack_fingerprint = Column(String(64), default="")
+    # cost telemetry (clients >= 0.10.0), from the manifest's optional `cost` block —
+    # absent for scripted policies and any client older than this column.
+    cost_usd = Column(Float, nullable=True)
+    cost_tokens = Column(Integer, nullable=True)
+    cost_calls = Column(Integer, nullable=True)
 
 
 def _engine():
@@ -66,20 +71,27 @@ Base.metadata.create_all(engine)
 
 
 def _ensure_columns() -> None:
-    """Add the reproducibility columns to an existing table (create_all won't ALTER)."""
+    """Add columns introduced after a deploy's first `create_all` (which won't ALTER)."""
     from sqlalchemy import text
 
-    for column in ("run_hash", "pack_fingerprint"):
+    columns = (
+        ("run_hash", "VARCHAR(64)"),
+        ("pack_fingerprint", "VARCHAR(64)"),
+        ("cost_usd", "FLOAT"),
+        ("cost_tokens", "INTEGER"),
+        ("cost_calls", "INTEGER"),
+    )
+    for column, sql_type in columns:
         try:
             with engine.begin() as conn:
                 conn.execute(
-                    text(f"ALTER TABLE submissions ADD COLUMN IF NOT EXISTS {column} VARCHAR(64)")
+                    text(f"ALTER TABLE submissions ADD COLUMN IF NOT EXISTS {column} {sql_type}")
                 )
         except Exception:
             # SQLite has no ADD COLUMN IF NOT EXISTS; try plain ADD and ignore "exists".
             try:
                 with engine.begin() as conn:
-                    conn.execute(text(f"ALTER TABLE submissions ADD COLUMN {column} VARCHAR(64)"))
+                    conn.execute(text(f"ALTER TABLE submissions ADD COLUMN {column} {sql_type}"))
             except Exception:
                 pass
 
@@ -198,6 +210,11 @@ def submit(payload: SubmissionIn, request: Request) -> dict:
         if abs(float(manifest["pass_rate"]) - float(pass_rate)) > 1e-6:
             raise HTTPException(status_code=422, detail="manifest pass_rate disagrees with report")
 
+    cost = manifest.get("cost") or {}
+    cost_usd = cost.get("usd") if isinstance(cost.get("usd"), (int, float)) else None
+    cost_tokens = cost.get("total_tokens") if isinstance(cost.get("total_tokens"), int) else None
+    cost_calls = cost.get("calls") if isinstance(cost.get("calls"), int) else None
+
     ip = (request.client.host if request.client else "") or ""
     if _rate_limited(ip):
         raise HTTPException(status_code=429, detail="too many submissions; try later")
@@ -214,6 +231,9 @@ def submit(payload: SubmissionIn, request: Request) -> dict:
             ip_hash=hashlib.sha256(ip.encode()).hexdigest()[:16],
             run_hash=run_hash,
             pack_fingerprint=pack_fingerprint,
+            cost_usd=cost_usd,
+            cost_tokens=cost_tokens,
+            cost_calls=cost_calls,
         )
         db.add(row)
         db.commit()
@@ -244,6 +264,7 @@ def leaderboard(pack: str = "core_v1", limit: int = 50) -> dict:
     best = {row.model: row for row in _best_per_model(pack, limit)}
     entries = [
         {
+            "id": row.id,
             "rank": i + 1,
             "model": row.model,
             "pass_rate": row.pass_rate,
@@ -252,10 +273,40 @@ def leaderboard(pack: str = "core_v1", limit: int = 50) -> dict:
             "submitted": row.created_at.isoformat() if row.created_at else None,
             "run_hash": row.run_hash or None,
             "reproducible": bool(row.run_hash),
+            "cost_usd": row.cost_usd,
+            "cost_tokens": row.cost_tokens,
         }
         for i, row in enumerate(best.values())
     ]
     return {"pack": pack, "entries": entries}
+
+
+@app.get("/v1/submissions/{submission_id}")
+def get_submission(submission_id: int) -> dict:
+    """The full public log of one run — every scenario, not just the aggregate."""
+    with SessionLocal() as db:
+        row = db.get(Submission, submission_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="no such submission")
+    return {
+        "id": row.id,
+        "pack_id": row.pack_id,
+        "model": row.model,
+        "submitted": row.created_at.isoformat() if row.created_at else None,
+        "pass_rate": row.pass_rate,
+        "passed": row.passed,
+        "n": row.n,
+        "results": row.results,
+        "run_hash": row.run_hash or None,
+        "pack_fingerprint": row.pack_fingerprint or None,
+        "reproducible": bool(row.run_hash),
+        "client_version": row.client_version or None,
+        "cost": (
+            {"usd": row.cost_usd, "total_tokens": row.cost_tokens, "calls": row.cost_calls}
+            if row.cost_usd is not None
+            else None
+        ),
+    }
 
 
 @app.get("/v1/packs/{pack_id}/breakdown")
@@ -296,15 +347,18 @@ def leaderboard_page(pack: str = "core_v1") -> str:
             if e["reproducible"]
             else ""
         )
+        cost = f"${e['cost_usd']:.3f}" if e.get("cost_usd") is not None else "&mdash;"
         return (
-            f"<tr><td>{e['rank']}</td><td class='m'>{_esc(e['model'])} {vf}</td>"
+            f"<tr><td>{e['rank']}</td>"
+            f"<td class='m'><a href='/runs/{e['id']}'>{_esc(e['model'])}</a> {vf}</td>"
             f"<td><b>{e['pass_rate']:.0%}</b></td><td>{e['passed']}/{e['n']}</td>"
+            f"<td class='d'>{cost}</td>"
             f"<td class='d'>{(e['submitted'] or '')[:10]}</td></tr>"
         )
 
     rows = (
         "".join(_row(e) for e in data["entries"])
-        or '<tr><td colspan="5" class="empty">No submissions yet — be the first.</td></tr>'
+        or '<tr><td colspan="6" class="empty">No submissions yet — be the first.</td></tr>'
     )
     n_scenarios = len(PACKS.get(pack, []))
     cmd = (
@@ -372,12 +426,74 @@ font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;overflow-x:au
 <p class="sub">{n_scenarios} outcome-checked scenarios — a run passes only when the world
 ends up in the goal state. Packs are deterministic; reproduce any entry.</p>
 <table><tr><th>#</th><th>model</th><th>pass rate</th><th>scenarios</th>
-<th class="d">submitted</th></tr>
+<th class="d">cost</th><th class="d">submitted</th></tr>
 {rows}</table>
 {hardest_html}
 <div class="how"><p><b>Get on the board</b> — any LiteLLM model, or your own agent loop via
 <a href="https://github.com/agentsynth/agentsynth#bench-a-model-get-on-the-leaderboard">--policy</a>:</p>
 <code>{cmd}</code></div>
+</div>
+</body></html>"""
+
+
+@app.get("/runs/{submission_id}", response_class=HTMLResponse)
+def run_page(submission_id: int) -> str:
+    """The public log for one run: every scenario, not just the pass rate that made
+    the leaderboard. This is the page a `reproducible` checkmark links to."""
+    detail = get_submission(submission_id)
+
+    def _check(r: Dict[str, Any]) -> str:
+        mark = "&#10003;" if r.get("passed") else "&#10007;"
+        cls = "ok" if r.get("passed") else "no"
+        return f"<tr><td class='m'>{_esc(str(r.get('id')))}</td><td class='{cls}'>{mark}</td></tr>"
+
+    rows = "".join(_check(r) for r in detail["results"] or [])
+    repro_html = (
+        f'<p class="sub">reproducible — run_hash <code class="inline">{detail["run_hash"]}</code>'
+        f' &middot; verify with <code class="inline">agentsynth pack verify-run</code></p>'
+        if detail["reproducible"]
+        else '<p class="sub">no run manifest attached — not independently reproducible</p>'
+    )
+    cost_html = ""
+    if detail["cost"]:
+        c = detail["cost"]
+        cost_html = (
+            f'<p class="sub">cost — ${c["usd"]:.4f} '
+            f"({c['calls']} calls, {c['total_tokens']} tokens)</p>"
+        )
+    return f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>AgentSynth — run {detail["id"]} ({_esc(detail["model"])})</title>
+<link rel="icon" href="{_FAVICON}">
+<style>
+:root{{--ink:#11141a;--muted:#5b6471;--line:#e7e9ee;--accent:#4f46e5}}
+*{{box-sizing:border-box}}
+body{{margin:0;background:#fff;color:var(--ink);
+font:16px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}}
+a{{color:var(--accent);text-decoration:none}} a:hover{{text-decoration:underline}}
+.wrap{{max-width:760px;margin:0 auto;padding:0 20px}}
+header{{border-bottom:1px solid var(--line)}}
+nav{{display:flex;align-items:center;height:64px}}
+.brand{{font-weight:700;font-size:18px;color:var(--ink)}} .brand b{{color:var(--accent)}}
+h1{{font-size:26px;letter-spacing:-.02em;margin:40px 0 6px;word-break:break-word}}
+p.sub{{color:var(--muted);margin:0 0 8px;font-size:14.5px}}
+code.inline{{background:#f3f4f7;padding:1px 6px;border-radius:5px;font-size:13px}}
+table{{border-collapse:collapse;width:100%;margin-top:20px}}
+td,th{{padding:9px 8px;border-bottom:1px solid var(--line);text-align:left;font-size:15px}}
+td.m{{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:14px}}
+td.ok{{color:#16a34a;font-weight:700}} td.no{{color:#dc2626;font-weight:700}}
+</style></head>
+<body>
+<header><div class="wrap"><nav><a class="brand" href="/">Agent<b>Synth</b></a></nav></div></header>
+<div class="wrap">
+<h1>{_esc(detail["model"])}</h1>
+<p class="sub"><a href="/leaderboard?pack={detail["pack_id"]}">{detail["pack_id"]}</a>
+&middot; {detail["pass_rate"]:.0%} ({detail["passed"]}/{detail["n"]})
+&middot; submitted {(detail["submitted"] or "")[:10]}</p>
+{repro_html}
+{cost_html}
+<table><tr><th>scenario</th><th>result</th></tr>{rows}</table>
 </div>
 </body></html>"""
 
