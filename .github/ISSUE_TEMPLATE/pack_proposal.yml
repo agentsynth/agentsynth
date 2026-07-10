@@ -1,0 +1,40 @@
+name: New scenario pack
+description: Propose (or claim) a new domain pack.
+labels: ["pack wanted"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        A pack is a handful of outcome-checked tasks over a seeded, writable world —
+        see [`packs/README.md`](https://github.com/agentsynth/agentsynth/blob/main/packs/README.md)
+        for what makes a good one and the gate it has to pass (`agentsynth pack validate`).
+        Claim this issue before starting so two people don't build the same pack.
+  - type: input
+    id: domain
+    attributes:
+      label: Domain
+      description: What real work does this cover? (e.g. "devops incident response", "CRM support tickets")
+      placeholder: e.g. filesystem + shell operations for a devops agent
+    validations:
+      required: true
+  - type: textarea
+    id: world
+    attributes:
+      label: The world
+      description: What's the seeded state — tables, files, an API — and what makes it writable?
+    validations:
+      required: true
+  - type: textarea
+    id: scenarios
+    attributes:
+      label: A few candidate tasks
+      description: Sketch 3-5 tasks, including at least one "policy says no" refusal.
+    validations:
+      required: false
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before you open the PR
+      options:
+        - label: agentsynth pack validate passes (oracle solves everything, do-nothing solves nothing)
+        - label: agentsynth pack audit is clean, or the weak scenarios are explained in the PR
